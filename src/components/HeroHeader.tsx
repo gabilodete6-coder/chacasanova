@@ -42,16 +42,18 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
     },
     {
       name: 'Bambu / Madeira Clara',
+      altName: 'Bambu',
       type: 'texture',
-      textureUrl: '/9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg',
+      textureUrl: './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg',
       fallbackColor: '#D2B48C',
       borderColor: '#C5A059',
       description: 'Textura natural e aconchego',
     },
     {
       name: 'Inox / Prata',
+      altName: 'Inox',
       type: 'texture',
-      textureUrl: '/inox.jpg',
+      textureUrl: './inox.jpg',
       fallbackColor: '#BDC3C7',
       borderColor: '#95A5A6',
       description: 'Acabamentos e eletros',
@@ -161,8 +163,8 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
                     {item.textureUrl ? (
                       <img
                         src={item.textureUrl}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
+                        alt={item.altName || item.name}
+                        className="w-full h-full object-cover rounded-full"
                         onError={(e) => {
                           // Fallback if image fails to load
                           (e.target as HTMLElement).style.display = 'none';
