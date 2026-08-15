@@ -2,14 +2,12 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   GiftItem, 
-  HouseInfo, 
-  TexturesConfig
+  HouseInfo
 } from './types';
 import { 
   initialGifts, 
   initialHouseInfo, 
-  initialCategories, 
-  initialTexturesConfig
+  initialCategories
 } from './data/initialData';
 import { Navbar } from './components/Navbar';
 import { HeroHeader } from './components/HeroHeader';
@@ -66,18 +64,6 @@ export function App() {
     return initialHouseInfo;
   });
 
-  const [texturesConfig, setTexturesConfig] = useState<TexturesConfig>(() => {
-    const saved = localStorage.getItem('cha_casa_nova_textures_v2');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error loading textures:', e);
-      }
-    }
-    return initialTexturesConfig;
-  });
-
   const [guestName, setGuestName] = useState<string>(() => {
     return localStorage.getItem('cha_casa_nova_guest_name_v2') || '';
   });
@@ -124,10 +110,6 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('cha_casa_nova_house_info_v2', JSON.stringify(houseInfo));
   }, [houseInfo]);
-
-  useEffect(() => {
-    localStorage.setItem('cha_casa_nova_textures_v2', JSON.stringify(texturesConfig));
-  }, [texturesConfig]);
 
   useEffect(() => {
     localStorage.setItem('cha_casa_nova_guest_name_v2', guestName);
@@ -285,13 +267,6 @@ export function App() {
     showToast(`Categoria "${categoryName}" removida.`, 'info');
   };
 
-  const handleUpdateTexture = (type: 'bambu' | 'inox', newImageUrl: string) => {
-    setTexturesConfig((prev) => ({
-      ...prev,
-      [type === 'bambu' ? 'bambuImage' : 'inoxImage']: newImageUrl,
-    }));
-  };
-
   // 7. Computed Data with Automatic Sorting (Available items FIRST, Reserved items LAST)
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -388,7 +363,6 @@ export function App() {
         {/* Top Header with Quick Shortcut & Color Palette with Texture Photos */}
         <HeroHeader
           houseInfo={houseInfo}
-          texturesConfig={texturesConfig}
           totalGifts={gifts.length}
           reservedCount={reservedCount}
           onExploreClick={scrollToGifts}
@@ -519,14 +493,12 @@ export function App() {
         gifts={gifts}
         categories={categories}
         houseInfo={houseInfo}
-        texturesConfig={texturesConfig}
         onAddGift={handleAddGift}
         onDeleteGift={handleDeleteGift}
         onToggleReserveGift={handleToggleReserveGift}
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
         onUpdateHouseInfo={setHouseInfo}
-        onUpdateTexture={handleUpdateTexture}
       />
 
       {/* Footer */}

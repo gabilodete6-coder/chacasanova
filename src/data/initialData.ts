@@ -1,9 +1,4 @@
-import { GiftItem, HouseInfo, InspirationPhoto, ColorSwatch, TexturesConfig } from '../types';
-
-export const initialTexturesConfig: TexturesConfig = {
-  bambuImage: 'https://images.unsplash.com/photo-1546484396-fb3fc6f95f98?auto=format&fit=crop&w=400&q=80',
-  inoxImage: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&w=400&q=80',
-};
+import { GiftItem, HouseInfo, InspirationPhoto, ColorSwatch } from '../types';
 
 export const initialHouseInfo: HouseInfo = {
   coupleNames: 'Larissa & Matheus',

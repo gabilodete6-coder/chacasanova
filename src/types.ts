@@ -26,11 +26,6 @@ export interface HouseInfo {
   welcomeMessage: string;
 }
 
-export interface TexturesConfig {
-  bambuImage: string;
-  inoxImage: string;
-}
-
 export interface ColorSwatch {
   name: string;
   colorCode: string;

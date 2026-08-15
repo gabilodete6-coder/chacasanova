@@ -1,10 +1,9 @@
 import React from 'react';
 import { Sparkles, Calendar, MapPin, CheckCircle2, ArrowDown, Gift } from 'lucide-react';
-import { HouseInfo, TexturesConfig } from '../types';
+import { HouseInfo } from '../types';
 
 interface HeroHeaderProps {
   houseInfo: HouseInfo;
-  texturesConfig: TexturesConfig;
   totalGifts: number;
   reservedCount: number;
   onExploreClick: () => void;
@@ -12,7 +11,6 @@ interface HeroHeaderProps {
 
 export const HeroHeader: React.FC<HeroHeaderProps> = ({
   houseInfo,
-  texturesConfig,
   totalGifts,
   reservedCount,
   onExploreClick,
@@ -45,7 +43,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
     {
       name: 'Bambu / Madeira Clara',
       type: 'texture',
-      textureUrl: texturesConfig.bambuImage,
+      textureUrl: '/9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg',
       fallbackColor: '#D2B48C',
       borderColor: '#C5A059',
       description: 'Textura natural e aconchego',
@@ -53,7 +51,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
     {
       name: 'Inox / Prata',
       type: 'texture',
-      textureUrl: texturesConfig.inoxImage,
+      textureUrl: '/inox.jpg',
       fallbackColor: '#BDC3C7',
       borderColor: '#95A5A6',
       description: 'Acabamentos e eletros',
