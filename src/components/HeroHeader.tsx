@@ -1,9 +1,10 @@
 import React from 'react';
 import { Sparkles, Calendar, MapPin, CheckCircle2, ArrowDown, Gift } from 'lucide-react';
-import { HouseInfo } from '../types';
+import { HouseInfo, TexturesConfig } from '../types';
 
 interface HeroHeaderProps {
   houseInfo: HouseInfo;
+  texturesConfig?: TexturesConfig;
   totalGifts: number;
   reservedCount: number;
   onExploreClick: () => void;
@@ -11,6 +12,7 @@ interface HeroHeaderProps {
 
 export const HeroHeader: React.FC<HeroHeaderProps> = ({
   houseInfo,
+  texturesConfig,
   totalGifts,
   reservedCount,
   onExploreClick,
@@ -44,7 +46,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
       name: 'Bambu / Madeira Clara',
       altName: 'Bambu',
       type: 'texture',
-      textureUrl: './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg',
+      textureUrl: texturesConfig?.bambuImage || '',
       fallbackColor: '#D2B48C',
       borderColor: '#C5A059',
       description: 'Textura natural e aconchego',
@@ -53,7 +55,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
       name: 'Inox / Prata',
       altName: 'Inox',
       type: 'texture',
-      textureUrl: './inox.jpg',
+      textureUrl: texturesConfig?.inoxImage || '',
       fallbackColor: '#BDC3C7',
       borderColor: '#95A5A6',
       description: 'Acabamentos e eletros',
@@ -166,13 +168,16 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
                         alt={item.altName || item.name}
                         className="w-full h-full object-cover rounded-full"
                         onError={(e) => {
-                          // Fallback if image fails to load
                           (e.target as HTMLElement).style.display = 'none';
+                          const parent = (e.target as HTMLElement).parentElement;
+                          if (parent) {
+                            parent.style.backgroundColor = item.fallbackColor;
+                          }
                         }}
                       />
                     ) : (
                       <div 
-                        className="w-full h-full"
+                        className="w-full h-full rounded-full"
                         style={{ backgroundColor: item.fallbackColor }}
                       />
                     )}

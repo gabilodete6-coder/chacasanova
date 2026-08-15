@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GiftItem, HouseInfo } from '../types';
+import { GiftItem, HouseInfo, TexturesConfig } from '../types';
 import { 
   ShieldCheck, 
   Lock, 
@@ -10,12 +10,14 @@ import {
   Upload, 
   Layers, 
   Gift, 
+  Palette,
   Settings, 
   Copy, 
   AlertCircle,
   Unlock,
   Eye,
-  EyeOff
+  EyeOff,
+  RotateCcw
 } from 'lucide-react';
 
 interface AdminModalProps {
@@ -27,12 +29,15 @@ interface AdminModalProps {
   gifts: GiftItem[];
   categories: string[];
   houseInfo: HouseInfo;
+  texturesConfig: TexturesConfig;
   onAddGift: (gift: Omit<GiftItem, 'id' | 'isReserved'>) => void;
   onDeleteGift: (giftId: string) => void;
   onToggleReserveGift: (giftId: string) => void;
   onAddCategory: (categoryName: string) => void;
   onDeleteCategory: (categoryName: string) => void;
   onUpdateHouseInfo: (info: HouseInfo) => void;
+  onUpdateTexture: (type: 'bambu' | 'inox', newImageUrl: string) => void;
+  onRemoveTexture: (type: 'bambu' | 'inox') => void;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -44,12 +49,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   gifts,
   categories,
   houseInfo,
+  texturesConfig,
   onAddGift,
   onDeleteGift,
   onToggleReserveGift,
   onAddCategory,
   onDeleteCategory,
   onUpdateHouseInfo,
+  onUpdateTexture,
+  onRemoveTexture,
 }) => {
   // Password state
   const [passwordInput, setPasswordInput] = useState('');
@@ -57,7 +65,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<'add_gift' | 'categories' | 'manage_gifts' | 'settings'>('add_gift');
+  const [activeTab, setActiveTab] = useState<'add_gift' | 'categories' | 'manage_gifts' | 'textures' | 'settings'>('add_gift');
 
   // Add Gift Form state
   const [newName, setNewName] = useState('');
@@ -71,6 +79,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Category Form state
   const [newCatInput, setNewCatInput] = useState('');
   const [catError, setCatError] = useState('');
+
+  // Textures upload state
+  const [targetTextureType, setTargetTextureType] = useState<'bambu' | 'inox' | null>(null);
+  const [textureSuccess, setTextureSuccess] = useState('');
+  const [textureError, setTextureError] = useState('');
+  const textureFileInputRef = useRef<HTMLInputElement>(null);
 
   // Settings form
   const [tempHouseInfo, setTempHouseInfo] = useState<HouseInfo>(houseInfo);
@@ -185,6 +199,41 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setCatError('');
   };
 
+  // Texture Upload Handler
+  const triggerTextureUpload = (type: 'bambu' | 'inox') => {
+    setTargetTextureType(type);
+    setTextureError('');
+    setTextureSuccess('');
+    if (textureFileInputRef.current) {
+      textureFileInputRef.current.value = '';
+      textureFileInputRef.current.click();
+    }
+  };
+
+  const handleTextureFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && targetTextureType) {
+      if (!file.type.startsWith('image/')) {
+        setTextureError('Por favor selecione um arquivo de imagem válido (.jpg, .jpeg, .png).');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (result) {
+          onUpdateTexture(targetTextureType, result);
+          setTextureSuccess(`Textura de ${targetTextureType === 'bambu' ? 'Bambu' : 'Inox'} atualizada e salva com sucesso!`);
+          setTimeout(() => setTextureSuccess(''), 3500);
+        }
+      };
+      reader.onerror = () => {
+        setTextureError('Erro ao carregar o arquivo de imagem.');
+      };
+      reader.readAsDataURL(file);
+    }
+    setTargetTextureType(null);
+  };
+
   // Copy Full Host Reservations List
   const handleCopyHostReservations = () => {
     const reservedList = gifts.filter((g) => g.isReserved);
@@ -218,6 +267,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4"
       onClick={onClose}
     >
+      {/* Hidden file input for texture uploads */}
+      <input
+        type="file"
+        ref={textureFileInputRef}
+        onChange={handleTextureFileChange}
+        accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+        className="hidden"
+      />
+
       <div 
         id="modal-admin-content"
         className="bg-white border-t-4 border-[#1A1A1A] border-x border-b border-[#BDC3C7] max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
@@ -363,6 +421,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               >
                 <Gift className="w-4 h-4 text-[#34495E]" />
                 <span>Presentes ({gifts.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('textures')}
+                className={`py-3 px-3 sm:px-4 text-xs font-bold uppercase tracking-wider border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                  activeTab === 'textures'
+                    ? 'border-[#1A1A1A] text-[#1A1A1A] bg-white'
+                    : 'border-transparent text-[#555] hover:text-[#1A1A1A]'
+                }`}
+              >
+                <Palette className="w-4 h-4 text-[#D2B48C]" />
+                <span>Texturas da Paleta</span>
               </button>
 
               <button
@@ -686,7 +757,153 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 4: EVENT SETTINGS */}
+              {/* TAB 4: PALETTE TEXTURES (Bambu & Inox Upload) */}
+              {activeTab === 'textures' && (
+                <div className="space-y-6 max-w-xl mx-auto">
+                  <div className="space-y-1">
+                    <h4 className="font-serif italic text-lg text-[#1A1A1A] font-semibold">
+                      Texturas da Paleta de Cores (Bambu & Inox)
+                    </h4>
+                    <p className="text-xs text-[#555]">
+                      Faça o upload de arquivos de imagem (.jpg, .jpeg, .png) do seu dispositivo para preencher as amostras circulares de Bambu e Inox. As imagens são convertidas e salvas no armazenamento local (localStorage) do seu navegador.
+                    </p>
+                  </div>
+
+                  {textureSuccess && (
+                    <div className="p-3 bg-[#E8F8F5] border border-[#27AE60] text-[#27AE60] text-xs font-bold flex items-center gap-2">
+                      <Check className="w-4 h-4" />
+                      <span>{textureSuccess}</span>
+                    </div>
+                  )}
+
+                  {textureError && (
+                    <div className="p-3 bg-[#FDEDEC] border border-[#C0392B] text-[#C0392B] text-xs font-bold flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{textureError}</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    
+                    {/* Texture Card 1: Bambu */}
+                    <div className="p-4 bg-[#FAF9F6] border border-[#BDC3C7] flex flex-col items-center text-center space-y-3">
+                      <div className="w-20 h-20 rounded-full border-4 border-[#C5A059] shadow-md overflow-hidden bg-white relative flex items-center justify-center">
+                        {texturesConfig?.bambuImage ? (
+                          <img 
+                            src={texturesConfig.bambuImage} 
+                            alt="Textura de Bambu" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div 
+                            className="w-full h-full flex items-center justify-center text-[10px] text-[#7F8C8D] font-bold uppercase tracking-wider"
+                            style={{ backgroundColor: '#D2B48C' }}
+                          >
+                            Cor Padrão
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <strong className="text-sm text-[#1A1A1A] block font-semibold">
+                          Bambu / Madeira Clara
+                        </strong>
+                        <span className="text-[11px] text-[#555]">
+                          {texturesConfig?.bambuImage ? 'Foto personalizada ativa' : 'Utilizando cor suave padrão'}
+                        </span>
+                      </div>
+
+                      <div className="w-full space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => triggerTextureUpload('bambu')}
+                          className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-[#D2B48C]" />
+                          <span>{texturesConfig?.bambuImage ? 'Trocar Foto Bambu' : 'Carregar Imagem Bambu'}</span>
+                        </button>
+
+                        {texturesConfig?.bambuImage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onRemoveTexture('bambu');
+                              setTextureSuccess('Textura de Bambu restaurada para a cor padrão!');
+                              setTimeout(() => setTextureSuccess(''), 3000);
+                            }}
+                            className="w-full py-1.5 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Remover foto (Usar cor padrão)</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Texture Card 2: Inox */}
+                    <div className="p-4 bg-[#FAF9F6] border border-[#BDC3C7] flex flex-col items-center text-center space-y-3">
+                      <div className="w-20 h-20 rounded-full border-4 border-[#95A5A6] shadow-md overflow-hidden bg-white relative flex items-center justify-center">
+                        {texturesConfig?.inoxImage ? (
+                          <img 
+                            src={texturesConfig.inoxImage} 
+                            alt="Textura de Inox" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div 
+                            className="w-full h-full flex items-center justify-center text-[10px] text-[#7F8C8D] font-bold uppercase tracking-wider"
+                            style={{ backgroundColor: '#BDC3C7' }}
+                          >
+                            Cor Padrão
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <strong className="text-sm text-[#1A1A1A] block font-semibold">
+                          Inox / Prata
+                        </strong>
+                        <span className="text-[11px] text-[#555]">
+                          {texturesConfig?.inoxImage ? 'Foto personalizada ativa' : 'Utilizando cor suave padrão'}
+                        </span>
+                      </div>
+
+                      <div className="w-full space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => triggerTextureUpload('inox')}
+                          className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-[#BDC3C7]" />
+                          <span>{texturesConfig?.inoxImage ? 'Trocar Foto Inox' : 'Carregar Imagem Inox'}</span>
+                        </button>
+
+                        {texturesConfig?.inoxImage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onRemoveTexture('inox');
+                              setTextureSuccess('Textura de Inox restaurada para a cor padrão!');
+                              setTimeout(() => setTextureSuccess(''), 3000);
+                            }}
+                            className="w-full py-1.5 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Remover foto (Usar cor padrão)</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <div className="bg-white p-3.5 border border-[#BDC3C7] text-xs text-[#555] leading-relaxed">
+                    💡 <strong>Como funciona:</strong> Ao carregar uma foto, o arquivo é convertido em Base64 e persistido no armazenamento local do navegador (<code>localStorage</code>). Se você não enviar nenhuma imagem ou optar por remover a foto, a amostra circular exibirá a cor suave padrão.
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: EVENT SETTINGS */}
               {activeTab === 'settings' && (
                 <form onSubmit={handleSaveSettings} className="space-y-4 max-w-xl mx-auto">
                   <div className="space-y-1">
