@@ -1,0 +1,6 @@
+{
+  "name": "Chá de Casa Nova - Lista de Presentes",
+  "description": "Aplicação web moderna e aconchegante para lista e reserva de presentes de Chá de Casa Nova com controle de itens, mural de inspirações e área do convidado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
