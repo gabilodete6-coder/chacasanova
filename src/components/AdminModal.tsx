@@ -18,12 +18,14 @@ import {
   Eye,
   EyeOff,
   RotateCcw,
-  Link as LinkIcon,
   Database,
   RefreshCw,
   User,
-  Heart
+  Heart,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
+import { uploadTextureToSupabaseStorage } from '../lib/supabase';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -89,18 +91,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [newCatInput, setNewCatInput] = useState('');
   const [catError, setCatError] = useState('');
 
-  // Textures upload state
-  const [targetTextureType, setTargetTextureType] = useState<'bambu' | 'inox' | null>(null);
-  const [bambuUrlInput, setBambuUrlInput] = useState(texturesConfig?.bambuImage || '');
-  const [inoxUrlInput, setInoxUrlInput] = useState(texturesConfig?.inoxImage || '');
+  // Textures upload & Supabase Storage state
+  const [bambuPendingFile, setBambuPendingFile] = useState<File | null>(null);
+  const [bambuPendingPreview, setBambuPendingPreview] = useState<string | null>(null);
+  const [inoxPendingFile, setInoxPendingFile] = useState<File | null>(null);
+  const [inoxPendingPreview, setInoxPendingPreview] = useState<string | null>(null);
+  const [isUploadingTexture, setIsUploadingTexture] = useState<'bambu' | 'inox' | null>(null);
   const [textureSuccess, setTextureSuccess] = useState('');
   const [textureError, setTextureError] = useState('');
-  const textureFileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setBambuUrlInput(texturesConfig?.bambuImage || '');
-    setInoxUrlInput(texturesConfig?.inoxImage || '');
-  }, [texturesConfig]);
+  const bambuFileInputRef = useRef<HTMLInputElement>(null);
+  const inoxFileInputRef = useRef<HTMLInputElement>(null);
 
   // Host summary copy state
   const [copiedSummary, setCopiedSummary] = useState(false);
@@ -207,53 +207,88 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setCatError('');
   };
 
-  // Texture Upload Handler
-  const triggerTextureUpload = (type: 'bambu' | 'inox') => {
-    setTargetTextureType(type);
-    setTextureError('');
-    setTextureSuccess('');
-    if (textureFileInputRef.current) {
-      textureFileInputRef.current.value = '';
-      textureFileInputRef.current.click();
-    }
-  };
-
-  const handleTextureFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Textures file selection, Supabase Storage upload, and reset handlers
+  const handleTextureFileSelect = (type: 'bambu' | 'inox', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && targetTextureType) {
-      if (!file.type.startsWith('image/')) {
-        setTextureError('Por favor selecione um arquivo de imagem válido (.jpg, .jpeg, .png, .webp).');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        if (result) {
-          onUpdateTexture(targetTextureType, result);
-          if (targetTextureType === 'bambu') setBambuUrlInput(result);
-          if (targetTextureType === 'inox') setInoxUrlInput(result);
-          setTextureSuccess(`Textura de ${targetTextureType === 'bambu' ? 'Bambu' : 'Inox'} convertida para Base64 e salva com sucesso!`);
-          setTimeout(() => setTextureSuccess(''), 3500);
-        }
-      };
-      reader.onerror = () => {
-        setTextureError('Erro ao converter o arquivo de imagem para Data URL.');
-      };
-      reader.readAsDataURL(file);
-    }
-    setTargetTextureType(null);
-  };
+    if (!file) return;
 
-  const handleApplyUrl = (type: 'bambu' | 'inox') => {
-    const url = type === 'bambu' ? bambuUrlInput.trim() : inoxUrlInput.trim();
-    if (!url) {
-      setTextureError('Por favor insira um link ou URL de imagem válido.');
+    if (!file.type.startsWith('image/')) {
+      setTextureError('Por favor selecione um arquivo de imagem válido (.jpg, .jpeg, .png, .webp).');
       return;
     }
-    onUpdateTexture(type, url);
+
     setTextureError('');
-    setTextureSuccess(`Link da textura de ${type === 'bambu' ? 'Bambu' : 'Inox'} aplicado com sucesso!`);
-    setTimeout(() => setTextureSuccess(''), 3500);
+    setTextureSuccess('');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const previewUrl = event.target?.result as string;
+      if (type === 'bambu') {
+        setBambuPendingFile(file);
+        setBambuPendingPreview(previewUrl);
+      } else {
+        setInoxPendingFile(file);
+        setInoxPendingPreview(previewUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleConfirmSaveTexture = async (type: 'bambu' | 'inox') => {
+    const file = type === 'bambu' ? bambuPendingFile : inoxPendingFile;
+    if (!file) {
+      setTextureError('Nenhum arquivo de imagem selecionado para confirmar.');
+      return;
+    }
+
+    setIsUploadingTexture(type);
+    setTextureError('');
+    setTextureSuccess('');
+
+    try {
+      const result = await uploadTextureToSupabaseStorage(file, type);
+      if (result?.url) {
+        onUpdateTexture(type, result.url);
+
+        if (type === 'bambu') {
+          setBambuPendingFile(null);
+          setBambuPendingPreview(null);
+          if (bambuFileInputRef.current) bambuFileInputRef.current.value = '';
+        } else {
+          setInoxPendingFile(null);
+          setInoxPendingPreview(null);
+          if (inoxFileInputRef.current) inoxFileInputRef.current.value = '';
+        }
+
+        const isFallback = result.isBase64Fallback;
+        setTextureSuccess(
+          `Foto de textura de ${type === 'bambu' ? 'Bambu' : 'Inox'} confirmada e salva com sucesso!${
+            isFallback ? '' : ' (Armazenada no Supabase Storage)'
+          }`
+        );
+        setTimeout(() => setTextureSuccess(''), 4000);
+      } else {
+        setTextureError('Falha ao processar o upload da imagem. Tente novamente.');
+      }
+    } catch (err) {
+      console.error('Erro no upload da textura:', err);
+      setTextureError('Erro durante o upload da imagem para o Supabase Storage.');
+    } finally {
+      setIsUploadingTexture(null);
+    }
+  };
+
+  const handleCancelPendingTexture = (type: 'bambu' | 'inox') => {
+    if (type === 'bambu') {
+      setBambuPendingFile(null);
+      setBambuPendingPreview(null);
+      if (bambuFileInputRef.current) bambuFileInputRef.current.value = '';
+    } else {
+      setInoxPendingFile(null);
+      setInoxPendingPreview(null);
+      if (inoxFileInputRef.current) inoxFileInputRef.current.value = '';
+    }
+    setTextureError('');
   };
 
   const handleResetDefaultImage = (type: 'bambu' | 'inox') => {
@@ -261,8 +296,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       ? './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg' 
       : './inox.jpg';
     onUpdateTexture(type, defaultUrl);
-    if (type === 'bambu') setBambuUrlInput(defaultUrl);
-    if (type === 'inox') setInoxUrlInput(defaultUrl);
+    handleCancelPendingTexture(type);
     setTextureError('');
     setTextureSuccess(`Textura de ${type === 'bambu' ? 'Bambu' : 'Inox'} restaurada para a imagem padrão!`);
     setTimeout(() => setTextureSuccess(''), 3500);
@@ -293,15 +327,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4"
       onClick={onClose}
     >
-      {/* Hidden file input for texture uploads */}
-      <input
-        type="file"
-        ref={textureFileInputRef}
-        onChange={handleTextureFileChange}
-        accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml,image/*"
-        className="hidden"
-      />
-
       <div 
         id="modal-admin-content"
         className="bg-white border-t-4 border-[#1A1A1A] border-x border-b border-[#BDC3C7] max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
@@ -791,7 +816,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 4: PALETTE TEXTURES (Bambu & Inox Upload / URL) */}
+              {/* TAB 4: PALETTE TEXTURES (Bambu & Inox Upload) */}
               {activeTab === 'textures' && (
                 <div className="space-y-6 max-w-2xl mx-auto">
                   <div className="space-y-1">
@@ -799,13 +824,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       Texturas da Paleta de Cores (Bambu & Inox)
                     </h4>
                     <p className="text-xs text-[#555]">
-                      Personalize as texturas de <strong>Bambu</strong> e <strong>Inox</strong> fazendo o upload de uma imagem do seu dispositivo (convertida para Base64) ou inserindo uma URL pública (.jpg, .jpeg, .png, .webp, .svg).
+                      Selecione uma foto do seu computador ou celular (.jpg, .jpeg, .png, .webp). Ao escolher a foto, veja a prévia na tela e clique em <strong>Confirmar Foto</strong> para armazená-la no Supabase Storage.
                     </p>
                   </div>
 
                   {textureSuccess && (
                     <div className="p-3 bg-[#E8F8F5] border border-[#27AE60] text-[#27AE60] text-xs font-bold flex items-center gap-2">
-                      <Check className="w-4 h-4 shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
                       <span>{textureSuccess}</span>
                     </div>
                   )}
@@ -821,20 +846,20 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     
                     {/* Texture Card 1: Bambu */}
                     <div className="p-4 bg-[#FAF9F6] border border-[#BDC3C7] flex flex-col items-center space-y-4">
-                      {/* Swatch Preview with direct background style */}
+                      {/* Swatch Preview */}
                       <div 
-                        className="w-20 h-20 rounded-full border-4 border-[#C5A059] shadow-md relative overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
+                        className="w-24 h-24 rounded-full border-4 border-[#C5A059] shadow-md relative overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
                         style={{
                           backgroundColor: '#D2B48C',
-                          backgroundImage: texturesConfig?.bambuImage ? `url("${texturesConfig.bambuImage}")` : undefined,
+                          backgroundImage: (bambuPendingPreview || texturesConfig?.bambuImage) ? `url("${bambuPendingPreview || texturesConfig.bambuImage}")` : undefined,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
                           backgroundRepeat: 'no-repeat',
                         }}
                       >
-                        {texturesConfig?.bambuImage ? (
+                        {(bambuPendingPreview || texturesConfig?.bambuImage) ? (
                           <img
-                            src={texturesConfig.bambuImage}
+                            src={bambuPendingPreview || texturesConfig.bambuImage}
                             alt="Textura Bambu"
                             className="w-full h-full object-cover rounded-full pointer-events-none"
                             onError={(e) => {
@@ -852,96 +877,118 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         <strong className="text-sm text-[#1A1A1A] block font-semibold">
                           Bambu
                         </strong>
-                        <span className="text-[11px] text-[#555]">
-                          {texturesConfig?.bambuImage?.startsWith('data:') 
-                            ? 'Foto personalizada (Base64 local)' 
-                            : texturesConfig?.bambuImage 
-                            ? 'Imagem ativa' 
-                            : 'Utilizando cor neutra padrão'}
-                        </span>
+                        {bambuPendingPreview ? (
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-[#FEF9E7] border border-[#F1C40F] text-[#B7950B] text-[10px] font-bold uppercase tracking-wider">
+                            Prévia selecionada (não salva)
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-[#555]">
+                            {texturesConfig?.bambuImage 
+                              ? (texturesConfig.bambuImage.startsWith('http') ? 'Foto ativa no Supabase' : 'Foto ativa')
+                              : 'Utilizando cor neutra padrão'}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Action 1: Upload File */}
+                      {/* Hidden File Input */}
+                      <input
+                        type="file"
+                        ref={bambuFileInputRef}
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
+                        onChange={(e) => handleTextureFileSelect('bambu', e)}
+                        className="hidden"
+                      />
+
+                      {/* Actions for Bambu */}
                       <div className="w-full space-y-2">
-                        <button
-                          type="button"
-                          onClick={() => triggerTextureUpload('bambu')}
-                          className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer"
-                        >
-                          <Upload className="w-3.5 h-3.5 text-[#D2B48C]" />
-                          <span>Carregar Foto do Aparelho</span>
-                        </button>
-                      </div>
+                        {bambuPendingFile ? (
+                          <div className="space-y-2 w-full">
+                            <button
+                              type="button"
+                              disabled={isUploadingTexture === 'bambu'}
+                              onClick={() => handleConfirmSaveTexture('bambu')}
+                              className="w-full py-2.5 bg-[#27AE60] hover:bg-[#219150] text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                            >
+                              {isUploadingTexture === 'bambu' ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                                  <span>Salvando no Supabase...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Check className="w-4 h-4 text-white" />
+                                  <span>Confirmar Foto</span>
+                                </>
+                              )}
+                            </button>
 
-                      {/* Action 2: Link / URL Input */}
-                      <div className="w-full space-y-1.5 pt-2 border-t border-[#BDC3C7]/60">
-                        <label className="text-[11px] font-bold uppercase tracking-wider text-[#34495E] flex items-center gap-1">
-                          <LinkIcon className="w-3 h-3" />
-                          <span>Ou colar Link / URL da imagem:</span>
-                        </label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            value={bambuUrlInput}
-                            onChange={(e) => setBambuUrlInput(e.target.value)}
-                            placeholder="https://... ou ./bambu.jpg"
-                            className="flex-1 px-2.5 py-1.5 border border-[#BDC3C7] text-xs focus:border-[#1A1A1A] focus:outline-hidden bg-white"
-                          />
+                            <button
+                              type="button"
+                              disabled={isUploadingTexture === 'bambu'}
+                              onClick={() => handleCancelPendingTexture('bambu')}
+                              className="w-full py-1.5 bg-white hover:bg-[#FAF9F6] border border-[#BDC3C7] text-xs font-semibold text-[#555] transition-colors cursor-pointer"
+                            >
+                              Cancelar Seleção
+                            </button>
+                          </div>
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => handleApplyUrl('bambu')}
-                            className="px-3 py-1.5 bg-[#34495E] hover:bg-[#1A1A1A] text-white text-xs font-bold uppercase transition-colors shrink-0 cursor-pointer"
+                            onClick={() => bambuFileInputRef.current?.click()}
+                            className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer"
                           >
-                            Aplicar
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Action 3: Reset options */}
-                      <div className="w-full pt-2 border-t border-[#BDC3C7]/60 flex flex-col gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleResetDefaultImage('bambu')}
-                          className="w-full py-1 text-[11px] text-[#34495E] hover:bg-[#EAECEE] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          <span>Restaurar Imagem Padrão</span>
-                        </button>
-
-                        {texturesConfig?.bambuImage && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onRemoveTexture('bambu');
-                              setBambuUrlInput('');
-                              setTextureSuccess('Textura de Bambu configurada para a cor sólida padrão!');
-                              setTimeout(() => setTextureSuccess(''), 3000);
-                            }}
-                            className="w-full py-1 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Remover Foto (Usar apenas cor)</span>
+                            <Upload className="w-3.5 h-3.5 text-[#D2B48C]" />
+                            <span>Selecionar Foto do Aparelho</span>
                           </button>
                         )}
                       </div>
+
+                      {/* Reset & Remove options */}
+                      {!bambuPendingFile && (
+                        <div className="w-full pt-2 border-t border-[#BDC3C7]/60 flex flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleResetDefaultImage('bambu')}
+                            className="w-full py-1 text-[11px] text-[#34495E] hover:bg-[#EAECEE] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Restaurar Imagem Padrão</span>
+                          </button>
+
+                          {texturesConfig?.bambuImage && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onRemoveTexture('bambu');
+                                setTextureSuccess('Textura de Bambu configurada para a cor sólida padrão!');
+                                setTimeout(() => setTextureSuccess(''), 3000);
+                              }}
+                              className="w-full py-1 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Remover Foto (Usar apenas cor)</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Texture Card 2: Inox */}
                     <div className="p-4 bg-[#FAF9F6] border border-[#BDC3C7] flex flex-col items-center space-y-4">
-                      {/* Swatch Preview with direct background style */}
+                      {/* Swatch Preview */}
                       <div 
-                        className="w-20 h-20 rounded-full border-4 border-[#95A5A6] shadow-md relative overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
+                        className="w-24 h-24 rounded-full border-4 border-[#95A5A6] shadow-md relative overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
                         style={{
                           backgroundColor: '#BDC3C7',
-                          backgroundImage: texturesConfig?.inoxImage ? `url("${texturesConfig.inoxImage}")` : undefined,
+                          backgroundImage: (inoxPendingPreview || texturesConfig?.inoxImage) ? `url("${inoxPendingPreview || texturesConfig.inoxImage}")` : undefined,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
                           backgroundRepeat: 'no-repeat',
                         }}
                       >
-                        {texturesConfig?.inoxImage ? (
+                        {(inoxPendingPreview || texturesConfig?.inoxImage) ? (
                           <img
-                            src={texturesConfig.inoxImage}
+                            src={inoxPendingPreview || texturesConfig.inoxImage}
                             alt="Textura Inox"
                             className="w-full h-full object-cover rounded-full pointer-events-none"
                             onError={(e) => {
@@ -959,84 +1006,106 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         <strong className="text-sm text-[#1A1A1A] block font-semibold">
                           Inox
                         </strong>
-                        <span className="text-[11px] text-[#555]">
-                          {texturesConfig?.inoxImage?.startsWith('data:') 
-                            ? 'Foto personalizada (Base64 local)' 
-                            : texturesConfig?.inoxImage 
-                            ? 'Imagem ativa' 
-                            : 'Utilizando cor neutra padrão'}
-                        </span>
+                        {inoxPendingPreview ? (
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-[#FEF9E7] border border-[#F1C40F] text-[#B7950B] text-[10px] font-bold uppercase tracking-wider">
+                            Prévia selecionada (não salva)
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-[#555]">
+                            {texturesConfig?.inoxImage 
+                              ? (texturesConfig.inoxImage.startsWith('http') ? 'Foto ativa no Supabase' : 'Foto ativa')
+                              : 'Utilizando cor neutra padrão'}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Action 1: Upload File */}
+                      {/* Hidden File Input */}
+                      <input
+                        type="file"
+                        ref={inoxFileInputRef}
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
+                        onChange={(e) => handleTextureFileSelect('inox', e)}
+                        className="hidden"
+                      />
+
+                      {/* Actions for Inox */}
                       <div className="w-full space-y-2">
-                        <button
-                          type="button"
-                          onClick={() => triggerTextureUpload('inox')}
-                          className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer"
-                        >
-                          <Upload className="w-3.5 h-3.5 text-[#95A5A6]" />
-                          <span>Carregar Foto do Aparelho</span>
-                        </button>
-                      </div>
+                        {inoxPendingFile ? (
+                          <div className="space-y-2 w-full">
+                            <button
+                              type="button"
+                              disabled={isUploadingTexture === 'inox'}
+                              onClick={() => handleConfirmSaveTexture('inox')}
+                              className="w-full py-2.5 bg-[#27AE60] hover:bg-[#219150] text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                            >
+                              {isUploadingTexture === 'inox' ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                                  <span>Salvando no Supabase...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Check className="w-4 h-4 text-white" />
+                                  <span>Confirmar Foto</span>
+                                </>
+                              )}
+                            </button>
 
-                      {/* Action 2: Link / URL Input */}
-                      <div className="w-full space-y-1.5 pt-2 border-t border-[#BDC3C7]/60">
-                        <label className="text-[11px] font-bold uppercase tracking-wider text-[#34495E] flex items-center gap-1">
-                          <LinkIcon className="w-3 h-3" />
-                          <span>Ou colar Link / URL da imagem:</span>
-                        </label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            value={inoxUrlInput}
-                            onChange={(e) => setInoxUrlInput(e.target.value)}
-                            placeholder="https://... ou ./inox.jpg"
-                            className="flex-1 px-2.5 py-1.5 border border-[#BDC3C7] text-xs focus:border-[#1A1A1A] focus:outline-hidden bg-white"
-                          />
+                            <button
+                              type="button"
+                              disabled={isUploadingTexture === 'inox'}
+                              onClick={() => handleCancelPendingTexture('inox')}
+                              className="w-full py-1.5 bg-white hover:bg-[#FAF9F6] border border-[#BDC3C7] text-xs font-semibold text-[#555] transition-colors cursor-pointer"
+                            >
+                              Cancelar Seleção
+                            </button>
+                          </div>
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => handleApplyUrl('inox')}
-                            className="px-3 py-1.5 bg-[#34495E] hover:bg-[#1A1A1A] text-white text-xs font-bold uppercase transition-colors shrink-0 cursor-pointer"
+                            onClick={() => inoxFileInputRef.current?.click()}
+                            className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer"
                           >
-                            Aplicar
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Action 3: Reset options */}
-                      <div className="w-full pt-2 border-t border-[#BDC3C7]/60 flex flex-col gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleResetDefaultImage('inox')}
-                          className="w-full py-1 text-[11px] text-[#34495E] hover:bg-[#EAECEE] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          <span>Restaurar Imagem Padrão</span>
-                        </button>
-
-                        {texturesConfig?.inoxImage && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onRemoveTexture('inox');
-                              setInoxUrlInput('');
-                              setTextureSuccess('Textura de Inox configurada para a cor sólida padrão!');
-                              setTimeout(() => setTextureSuccess(''), 3000);
-                            }}
-                            className="w-full py-1 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Remover Foto (Usar apenas cor)</span>
+                            <Upload className="w-3.5 h-3.5 text-[#95A5A6]" />
+                            <span>Selecionar Foto do Aparelho</span>
                           </button>
                         )}
                       </div>
+
+                      {/* Reset & Remove options */}
+                      {!inoxPendingFile && (
+                        <div className="w-full pt-2 border-t border-[#BDC3C7]/60 flex flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleResetDefaultImage('inox')}
+                            className="w-full py-1 text-[11px] text-[#34495E] hover:bg-[#EAECEE] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Restaurar Imagem Padrão</span>
+                          </button>
+
+                          {texturesConfig?.inoxImage && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onRemoveTexture('inox');
+                                setTextureSuccess('Textura de Inox configurada para a cor sólida padrão!');
+                                setTimeout(() => setTextureSuccess(''), 3000);
+                              }}
+                              className="w-full py-1 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Remover Foto (Usar apenas cor)</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                   </div>
 
                   <div className="bg-white p-3.5 border border-[#BDC3C7] text-xs text-[#555] leading-relaxed">
-                    💡 <strong>Como funciona:</strong> Ao fazer o upload de uma imagem do seu aparelho, ela é convertida diretamente para <strong>Data URL (Base64)</strong> e armazenada no <code>localStorage</code> do navegador, sendo aplicada de imediato no estilo de background dos círculos da paleta de cores. Você também pode digitar ou colar qualquer link público de imagem.
+                    💡 <strong>Como funciona:</strong> Ao selecionar a imagem do computador ou celular, você visualiza a prévia imediatamente. Ao clicar em <strong>Confirmar Foto</strong>, o arquivo é enviado e armazenado com segurança no <strong>Supabase Storage</strong> e a URL pública gerada é sincronizada no banco de dados e exibida tanto em computadores quanto em celulares.
                   </div>
                 </div>
               )}

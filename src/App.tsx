@@ -15,6 +15,8 @@ import {
   fetchPresentesFromSupabase, 
   fetchCategoriasFromSupabase, 
   fetchHouseInfoFromSupabase,
+  fetchTexturesFromSupabase,
+  saveTexturesToSupabase,
   updateGiftReservationInSupabase,
   addGiftToSupabase,
   deleteGiftFromSupabase,
@@ -140,6 +142,16 @@ export function App() {
 
         if (supabaseCategories && supabaseCategories.length > 0) {
           setCategories(supabaseCategories);
+        }
+
+        // Also fetch textures config from Supabase
+        const supabaseTextures = await fetchTexturesFromSupabase();
+        if (!isMounted) return;
+        if (supabaseTextures && (supabaseTextures.bambuImage || supabaseTextures.inoxImage)) {
+          setTexturesConfig((prev) => ({
+            bambuImage: supabaseTextures.bambuImage || prev.bambuImage,
+            inoxImage: supabaseTextures.inoxImage || prev.inoxImage,
+          }));
         }
       } catch (err) {
         console.error('Erro na conexão com Supabase:', err);
@@ -424,18 +436,22 @@ export function App() {
     showToast(res.message, res.success ? 'success' : 'info');
   };
 
-  const handleUpdateTexture = (type: 'bambu' | 'inox', newImageUrl: string) => {
-    setTexturesConfig((prev) => ({
-      ...prev,
+  const handleUpdateTexture = async (type: 'bambu' | 'inox', newImageUrl: string) => {
+    const updated: TexturesConfig = {
+      ...texturesConfig,
       [type === 'bambu' ? 'bambuImage' : 'inoxImage']: newImageUrl,
-    }));
+    };
+    setTexturesConfig(updated);
+    await saveTexturesToSupabase(updated);
   };
 
-  const handleRemoveTexture = (type: 'bambu' | 'inox') => {
-    setTexturesConfig((prev) => ({
-      ...prev,
+  const handleRemoveTexture = async (type: 'bambu' | 'inox') => {
+    const updated: TexturesConfig = {
+      ...texturesConfig,
       [type === 'bambu' ? 'bambuImage' : 'inoxImage']: '',
-    }));
+    };
+    setTexturesConfig(updated);
+    await saveTexturesToSupabase(updated);
   };
 
   // 7. Computed Data with Automatic Sorting (Available items FIRST, Reserved items LAST)

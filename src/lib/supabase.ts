@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { GiftItem, HouseInfo } from '../types';
+import { GiftItem, HouseInfo, TexturesConfig } from '../types';
 
 export const SUPABASE_URL = 'https://flnytwosxztpzkzxjjia.supabase.co';
 export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsbnl0d29zeHp0cHprenhqamlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NzU4NTcsImV4cCI6MjEwMjM1MTg1N30.hzhOkutPLYcQAkMELqJJ6FiG7Ez-REC5Yr5EfYMZITk';
@@ -379,6 +379,106 @@ export async function saveHouseInfoToSupabase(info: HouseInfo): Promise<boolean>
     return !error;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Upload texture image file to Supabase Storage and return its public URL
+ */
+export async function uploadTextureToSupabaseStorage(
+  file: File,
+  type: 'bambu' | 'inox'
+): Promise<{ url: string; isBase64Fallback?: boolean } | null> {
+  const extension = file.name.split('.').pop() || 'jpg';
+  const cleanExtension = extension.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'jpg';
+  const fileName = `textures/${type}_${Date.now()}.${cleanExtension}`;
+
+  // Candidate buckets to try in Supabase Storage
+  const bucketsToTry = ['presentes', 'texturas', 'imagens', 'images', 'public'];
+
+  for (const bucketName of bucketsToTry) {
+    try {
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type || `image/${cleanExtension}`,
+        });
+
+      if (!error && data) {
+        const { data: publicUrlData } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(fileName);
+
+        if (publicUrlData?.publicUrl) {
+          return { url: publicUrlData.publicUrl, isBase64Fallback: false };
+        }
+      }
+    } catch {
+      // Continue to next bucket
+    }
+  }
+
+  // If storage upload fails (e.g. bucket doesn't exist yet / strict RLS), convert to Base64 data URL as fallback so user is never blocked
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) {
+        resolve({ url: result, isBase64Fallback: true });
+      } else {
+        resolve(null);
+      }
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Save Textures configuration to Supabase table 'configuracoes'
+ */
+export async function saveTexturesToSupabase(textures: TexturesConfig): Promise<boolean> {
+  try {
+    const payload = {
+      bambu_image: textures.bambuImage || '',
+      inox_image: textures.inoxImage || '',
+      bambu_url: textures.bambuImage || '',
+      inox_url: textures.inoxImage || '',
+    };
+
+    const { error } = await supabase
+      .from('configuracoes')
+      .upsert([payload]);
+
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetch Textures configuration from Supabase table 'configuracoes'
+ */
+export async function fetchTexturesFromSupabase(): Promise<TexturesConfig | null> {
+  try {
+    const { data, error } = await supabase
+      .from('configuracoes')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      bambuImage: data.bambu_image || data.bambu_url || data.bambuImage || undefined,
+      inoxImage: data.inox_image || data.inox_url || data.inoxImage || undefined,
+    };
+  } catch {
+    return null;
   }
 }
 
