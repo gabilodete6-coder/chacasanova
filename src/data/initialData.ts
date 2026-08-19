@@ -43,7 +43,7 @@ export const paletteColors: ColorSwatch[] = [
     description: 'Toque de sofisticação e calma',
   },
   {
-    name: 'Bambu / Madeira Clara',
+    name: 'Bambu',
     colorCode: '#D2B48C',
     textColor: '#1A1A1A',
     borderColor: '#C5A059',

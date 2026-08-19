@@ -43,7 +43,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
       description: 'Toque clássico e sereno',
     },
     {
-      name: 'Bambu / Madeira Clara',
+      name: 'Bambu',
       altName: 'Bambu',
       type: 'texture',
       textureUrl: texturesConfig?.bambuImage || './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg',

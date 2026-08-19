@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GiftItem } from '../types';
-import { X, Check, Heart, User, MessageCircle, AlertCircle } from 'lucide-react';
+import { X, Check, Heart, User, AlertCircle } from 'lucide-react';
 
 interface ReserveModalProps {
   gift: GiftItem | null;
@@ -18,7 +18,6 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
   initialGuestName = '',
 }) => {
   const [guestName, setGuestName] = useState(initialGuestName);
-  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -43,7 +42,6 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
 
   const handleCancel = () => {
     setError('');
-    setMessage('');
     onClose();
   };
 
@@ -58,9 +56,8 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
     setError('');
 
     setTimeout(() => {
-      onConfirm(guestName.trim(), message.trim() || undefined);
+      onConfirm(guestName.trim());
       setIsSubmitting(false);
-      setMessage('');
     }, 250);
   };
 
@@ -153,25 +150,6 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
               <p className="text-[11px] text-[#7F8C8D]">
                 Seu nome servirá para sabermos quem nos presenteou com carinho.
               </p>
-            </div>
-
-            {/* Optional Message */}
-            <div className="space-y-1.5">
-              <label 
-                htmlFor="input-reserve-message" 
-                className="block text-xs font-bold text-[#1A1A1A] uppercase tracking-wider flex items-center justify-between"
-              >
-                <span>Recado para o Casal (Opcional)</span>
-                <MessageCircle className="w-4 h-4 text-[#34495E]" />
-              </label>
-              <textarea
-                id="input-reserve-message"
-                rows={2}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Escreva uma mensagem de carinho..."
-                className="w-full p-3 bg-[#FAF9F6] border border-[#BDC3C7] focus:border-[#1A1A1A] focus:bg-white text-sm text-[#1A1A1A] focus:outline-none transition-all resize-none"
-              />
             </div>
 
             {/* Error Message */}

@@ -43,42 +43,19 @@ import {
 const ADMIN_PASSWORD = '149610';
 
 export function App() {
-  // 1. Core State with LocalStorage
-  const [gifts, setGifts] = useState<GiftItem[]>(() => {
-    const saved = localStorage.getItem('cha_casa_nova_gifts_v2');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error loading saved gifts:', e);
-      }
-    }
-    return initialGifts;
-  });
+  // 1. Core State directly from Supabase (Zero mock fallback)
+  const [gifts, setGifts] = useState<GiftItem[]>([]);
+  const [isLoadingGifts, setIsLoadingGifts] = useState<boolean>(true);
 
-  const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem('cha_casa_nova_categories_v2');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error loading saved categories:', e);
-      }
-    }
-    return initialCategories;
-  });
+  const [categories, setCategories] = useState<string[]>([
+    'Cozinha',
+    'Cama & Banho',
+    'Eletros',
+    'Decoração',
+    'Área de Serviço',
+  ]);
 
-  const [houseInfo, setHouseInfo] = useState<HouseInfo>(() => {
-    const saved = localStorage.getItem('cha_casa_nova_house_info_v2');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error loading saved house info:', e);
-      }
-    }
-    return initialHouseInfo;
-  });
+  const [houseInfo, setHouseInfo] = useState<HouseInfo>(initialHouseInfo);
 
   const [texturesConfig, setTexturesConfig] = useState<TexturesConfig>(() => {
     const saved = localStorage.getItem('cha_casa_nova_textures_v2');
@@ -132,30 +109,37 @@ export function App() {
   // References
   const giftsSectionRef = useRef<HTMLDivElement>(null);
 
-  // Load from Supabase on mount and subscribe to Realtime channel
+  // Load directly from Supabase table 'presentes' on mount and subscribe to Realtime channel
   useEffect(() => {
     let isMounted = true;
 
     async function loadDataFromSupabase() {
+      setIsLoadingGifts(true);
       try {
-        const [supabaseGifts, supabaseCategories, supabaseHouseInfo] = await Promise.all([
-          fetchPresentesFromSupabase(),
+        // Direct query to table 'presentes' as requested
+        const { data: presentesData, error: presentesError } = await supabase
+          .from('presentes')
+          .select('*')
+          .order('id', { ascending: true });
+
+        if (!isMounted) return;
+
+        if (presentesError) {
+          console.warn('Erro ao carregar presentes do Supabase:', presentesError.message);
+          setIsSupabaseConnected(false);
+          setGifts([]);
+        } else {
+          setIsSupabaseConnected(true);
+          setGifts(presentesData ? presentesData.map(mapRowToGift) : []);
+        }
+
+        // Also fetch categories and houseInfo from Supabase if present
+        const [supabaseCategories, supabaseHouseInfo] = await Promise.all([
           fetchCategoriasFromSupabase(),
           fetchHouseInfoFromSupabase(),
         ]);
 
         if (!isMounted) return;
-
-        if (supabaseGifts && supabaseGifts.length > 0) {
-          setGifts(supabaseGifts);
-          setIsSupabaseConnected(true);
-        } else if (supabaseGifts && supabaseGifts.length === 0) {
-          setIsSupabaseConnected(true);
-          // Seed with initial items if table is freshly created and empty
-          syncAllToSupabase(initialGifts, initialCategories, initialHouseInfo);
-        } else {
-          setIsSupabaseConnected(false);
-        }
 
         if (supabaseCategories && supabaseCategories.length > 0) {
           setCategories(supabaseCategories);
@@ -165,8 +149,15 @@ export function App() {
           setHouseInfo(supabaseHouseInfo);
         }
       } catch (err) {
-        console.error('Erro ao conectar com Supabase:', err);
-        if (isMounted) setIsSupabaseConnected(false);
+        console.error('Erro na conexão com Supabase:', err);
+        if (isMounted) {
+          setIsSupabaseConnected(false);
+          setGifts([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGifts(false);
+        }
       }
     }
 
@@ -223,19 +214,7 @@ export function App() {
     };
   }, []);
 
-  // Save changes to localStorage
-  useEffect(() => {
-    localStorage.setItem('cha_casa_nova_gifts_v2', JSON.stringify(gifts));
-  }, [gifts]);
-
-  useEffect(() => {
-    localStorage.setItem('cha_casa_nova_categories_v2', JSON.stringify(categories));
-  }, [categories]);
-
-  useEffect(() => {
-    localStorage.setItem('cha_casa_nova_house_info_v2', JSON.stringify(houseInfo));
-  }, [houseInfo]);
-
+  // Save guest preference to localStorage
   useEffect(() => {
     localStorage.setItem('cha_casa_nova_textures_v2', JSON.stringify(texturesConfig));
   }, [texturesConfig]);
@@ -375,16 +354,26 @@ export function App() {
   };
 
   const handleDeleteGift = async (giftId: string) => {
+    // 1. Direct DELETE on Supabase table 'presentes'
+    const { error } = await supabase
+      .from('presentes')
+      .delete()
+      .eq('id', giftId);
+
+    if (error) {
+      console.error('Erro ao excluir presente do Supabase:', error);
+      showToast('Não foi possível excluir o presente no Supabase. Tente novamente.', 'info');
+      return;
+    }
+
+    // 2. Update screen state ONLY after confirmation
     setGifts((prev) => prev.filter((g) => g.id !== giftId));
     setMyReservedGiftIds((prev) => {
       const next = new Set(prev);
       next.delete(giftId);
       return next;
     });
-    showToast('Presente excluído da lista.', 'info');
-
-    // Async Supabase delete from 'presentes'
-    await deleteGiftFromSupabase(giftId);
+    showToast('Presente excluído com sucesso do Supabase.', 'info');
   };
 
   const handleToggleReserveGift = async (giftId: string) => {
@@ -596,8 +585,25 @@ export function App() {
                 myReservationsCount={myReservedGiftsList.length}
               />
 
-              {/* Filter Status Reset Button if empty */}
-              {filteredGifts.length === 0 ? (
+              {/* Gifts Loading / Empty / Content */}
+              {isLoadingGifts ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {[1, 2, 3, 4, 5, 6].map((idx) => (
+                    <div
+                      key={idx}
+                      className="bg-white border border-[#BDC3C7] p-5 space-y-4 animate-pulse shadow-xs"
+                    >
+                      <div className="w-full h-48 bg-[#FAF9F6] border border-[#BDC3C7]/40" />
+                      <div className="space-y-2">
+                        <div className="w-20 h-3 bg-[#EAECEE]" />
+                        <div className="w-3/4 h-5 bg-[#EAECEE]" />
+                        <div className="w-full h-3 bg-[#FAF9F6]" />
+                      </div>
+                      <div className="w-full h-10 bg-[#FAF9F6] border border-[#BDC3C7]" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredGifts.length === 0 ? (
                 <div className="py-16 text-center bg-white border border-[#BDC3C7] p-8 shadow-xs space-y-4">
                   <div className="w-14 h-14 bg-[#FAF9F6] border border-[#BDC3C7] text-[#34495E] mx-auto flex items-center justify-center">
                     <FilterX className="w-7 h-7" />

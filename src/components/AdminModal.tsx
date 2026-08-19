@@ -805,7 +805,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       Texturas da Paleta de Cores (Bambu & Inox)
                     </h4>
                     <p className="text-xs text-[#555]">
-                      Personalize as texturas de <strong>Bambu / Madeira Clara</strong> e <strong>Inox / Prata</strong> fazendo o upload de uma imagem do seu dispositivo (convertida para Base64) ou inserindo uma URL pública.
+                      Personalize as texturas de <strong>Bambu</strong> e <strong>Inox / Prata</strong> fazendo o upload de uma imagem do seu dispositivo (convertida para Base64) ou inserindo uma URL pública.
                     </p>
                   </div>
 
@@ -847,7 +847,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       
                       <div className="text-center">
                         <strong className="text-sm text-[#1A1A1A] block font-semibold">
-                          Bambu / Madeira Clara
+                          Bambu
                         </strong>
                         <span className="text-[11px] text-[#555]">
                           {texturesConfig?.bambuImage?.startsWith('data:') 
