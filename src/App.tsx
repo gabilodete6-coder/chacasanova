@@ -11,6 +11,20 @@ import {
   initialCategories,
   initialTexturesConfig
 } from './data/initialData';
+import { 
+  fetchPresentesFromSupabase, 
+  fetchCategoriasFromSupabase, 
+  fetchHouseInfoFromSupabase,
+  updateGiftReservationInSupabase,
+  addGiftToSupabase,
+  deleteGiftFromSupabase,
+  addCategoryToSupabase,
+  deleteCategoryFromSupabase,
+  saveHouseInfoToSupabase,
+  syncAllToSupabase,
+  mapRowToGift,
+  supabase
+} from './lib/supabase';
 import { Navbar } from './components/Navbar';
 import { HeroHeader } from './components/HeroHeader';
 import { CategoryFilters } from './components/CategoryFilters';
@@ -98,6 +112,8 @@ export function App() {
     return new Set<string>();
   });
 
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean | null>(null);
+
   // 2. Filter & Search State
   const [activeCategory, setActiveCategory] = useState<string>('Todas');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'reserved' | 'my_reserved'>('all');
@@ -115,6 +131,97 @@ export function App() {
 
   // References
   const giftsSectionRef = useRef<HTMLDivElement>(null);
+
+  // Load from Supabase on mount and subscribe to Realtime channel
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDataFromSupabase() {
+      try {
+        const [supabaseGifts, supabaseCategories, supabaseHouseInfo] = await Promise.all([
+          fetchPresentesFromSupabase(),
+          fetchCategoriasFromSupabase(),
+          fetchHouseInfoFromSupabase(),
+        ]);
+
+        if (!isMounted) return;
+
+        if (supabaseGifts && supabaseGifts.length > 0) {
+          setGifts(supabaseGifts);
+          setIsSupabaseConnected(true);
+        } else if (supabaseGifts && supabaseGifts.length === 0) {
+          setIsSupabaseConnected(true);
+          // Seed with initial items if table is freshly created and empty
+          syncAllToSupabase(initialGifts, initialCategories, initialHouseInfo);
+        } else {
+          setIsSupabaseConnected(false);
+        }
+
+        if (supabaseCategories && supabaseCategories.length > 0) {
+          setCategories(supabaseCategories);
+        }
+
+        if (supabaseHouseInfo && supabaseHouseInfo.coupleNames) {
+          setHouseInfo(supabaseHouseInfo);
+        }
+      } catch (err) {
+        console.error('Erro ao conectar com Supabase:', err);
+        if (isMounted) setIsSupabaseConnected(false);
+      }
+    }
+
+    loadDataFromSupabase();
+
+    // Subscribe to real-time changes in table 'presentes' and 'categorias'
+    const channel = supabase
+      .channel('realtime-supabase-gifts')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'presentes' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newGift = mapRowToGift(payload.new);
+            setGifts((prev) => {
+              if (prev.some((g) => g.id === newGift.id)) return prev;
+              return [newGift, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedGift = mapRowToGift(payload.new);
+            setGifts((prev) =>
+              prev.map((g) => (g.id === updatedGift.id ? updatedGift : g))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = String(payload.old?.id || '');
+            if (deletedId) {
+              setGifts((prev) => prev.filter((g) => g.id !== deletedId));
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'categorias' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newCat = payload.new.nome || payload.new.name || '';
+            if (newCat) {
+              setCategories((prev) => (prev.includes(newCat) ? prev : [...prev, newCat]));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedCat = payload.old?.nome || payload.old?.name || '';
+            if (deletedCat) {
+              setCategories((prev) => prev.filter((c) => c !== deletedCat));
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Save changes to localStorage
   useEffect(() => {
@@ -160,20 +267,22 @@ export function App() {
     setIsReserveModalOpen(true);
   };
 
-  const handleConfirmReservation = (name: string, message?: string) => {
+  const handleConfirmReservation = async (name: string, message?: string) => {
     if (!selectedGiftForReserve) return;
+    const targetGift = selectedGiftForReserve;
+    const reservedAt = new Date().toISOString();
 
     setGuestName(name);
 
     // Update gift in list
     setGifts((prevGifts) =>
       prevGifts.map((g) => {
-        if (g.id === selectedGiftForReserve.id) {
+        if (g.id === targetGift.id) {
           return {
             ...g,
             isReserved: true,
             reservedBy: name,
-            reservedAt: new Date().toISOString(),
+            reservedAt: reservedAt,
             reservationMessage: message,
           };
         }
@@ -182,7 +291,7 @@ export function App() {
     );
 
     // Add to my reserved items
-    setMyReservedGiftIds((prev) => new Set([...prev, selectedGiftForReserve.id]));
+    setMyReservedGiftIds((prev) => new Set([...prev, targetGift.id]));
 
     // Close modal
     setIsReserveModalOpen(false);
@@ -196,10 +305,19 @@ export function App() {
       colors: ['#D2B48C', '#34495E', '#1A1A1A', '#27AE60'],
     });
 
-    showToast(`O presente "${selectedGiftForReserve.name}" foi reservado com sucesso!`, 'success');
+    showToast(`O presente "${targetGift.name}" foi reservado com sucesso!`, 'success');
+
+    // Async Supabase update on table 'presentes'
+    await updateGiftReservationInSupabase(
+      targetGift.id,
+      true,
+      name,
+      reservedAt,
+      message
+    );
   };
 
-  const handleCancelReservation = (giftId: string) => {
+  const handleCancelReservation = async (giftId: string) => {
     const gift = gifts.find((g) => g.id === giftId);
     
     setGifts((prevGifts) =>
@@ -224,6 +342,9 @@ export function App() {
     });
 
     showToast(`Reserva do item "${gift?.name || 'Presente'}" cancelada. O item agora está disponível.`, 'info');
+
+    // Async Supabase update on table 'presentes'
+    await updateGiftReservationInSupabase(giftId, false);
   };
 
   // 6. Admin Authentication & Actions
@@ -239,7 +360,7 @@ export function App() {
     setIsAdminAuthenticated(false);
   };
 
-  const handleAddGift = (newGiftData: Omit<GiftItem, 'id' | 'isReserved'>) => {
+  const handleAddGift = async (newGiftData: Omit<GiftItem, 'id' | 'isReserved'>) => {
     const newId = `gift-custom-${Date.now()}`;
     const newGift: GiftItem = {
       ...newGiftData,
@@ -248,9 +369,12 @@ export function App() {
     };
     setGifts((prev) => [newGift, ...prev]);
     showToast(`"${newGift.name}" foi adicionado com sucesso!`);
+
+    // Async Supabase insert into 'presentes'
+    await addGiftToSupabase(newGift);
   };
 
-  const handleDeleteGift = (giftId: string) => {
+  const handleDeleteGift = async (giftId: string) => {
     setGifts((prev) => prev.filter((g) => g.id !== giftId));
     setMyReservedGiftIds((prev) => {
       const next = new Set(prev);
@@ -258,13 +382,19 @@ export function App() {
       return next;
     });
     showToast('Presente excluído da lista.', 'info');
+
+    // Async Supabase delete from 'presentes'
+    await deleteGiftFromSupabase(giftId);
   };
 
-  const handleToggleReserveGift = (giftId: string) => {
+  const handleToggleReserveGift = async (giftId: string) => {
+    const targetGift = gifts.find((g) => g.id === giftId);
+    if (!targetGift) return;
+    const isNowReserved = !targetGift.isReserved;
+
     setGifts((prev) =>
       prev.map((g) => {
         if (g.id === giftId) {
-          const isNowReserved = !g.isReserved;
           return {
             ...g,
             isReserved: isNowReserved,
@@ -274,19 +404,42 @@ export function App() {
         return g;
       })
     );
+
+    // Async Supabase update on 'presentes'
+    await updateGiftReservationInSupabase(
+      giftId,
+      isNowReserved,
+      isNowReserved ? 'Anfitrião' : undefined
+    );
   };
 
-  const handleAddCategory = (categoryName: string) => {
+  const handleAddCategory = async (categoryName: string) => {
     setCategories((prev) => [...prev, categoryName]);
     showToast(`Categoria "${categoryName}" criada com sucesso!`);
+
+    // Async Supabase insert into 'categorias'
+    await addCategoryToSupabase(categoryName);
   };
 
-  const handleDeleteCategory = (categoryName: string) => {
+  const handleDeleteCategory = async (categoryName: string) => {
     setCategories((prev) => prev.filter((c) => c !== categoryName));
     if (activeCategory === categoryName) {
       setActiveCategory('Todas');
     }
     showToast(`Categoria "${categoryName}" removida.`, 'info');
+
+    // Async Supabase delete from 'categorias'
+    await deleteCategoryFromSupabase(categoryName);
+  };
+
+  const handleUpdateHouseInfo = async (info: HouseInfo) => {
+    setHouseInfo(info);
+    await saveHouseInfoToSupabase(info);
+  };
+
+  const handleManualSyncSupabase = async () => {
+    const res = await syncAllToSupabase(gifts, categories, houseInfo);
+    showToast(res.message, res.success ? 'success' : 'info');
   };
 
   const handleUpdateTexture = (type: 'bambu' | 'inox', newImageUrl: string) => {
@@ -536,9 +689,11 @@ export function App() {
         onToggleReserveGift={handleToggleReserveGift}
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
-        onUpdateHouseInfo={setHouseInfo}
+        onUpdateHouseInfo={handleUpdateHouseInfo}
         onUpdateTexture={handleUpdateTexture}
         onRemoveTexture={handleRemoveTexture}
+        onSyncSupabase={handleManualSyncSupabase}
+        isSupabaseConnected={isSupabaseConnected}
       />
 
       {/* Footer */}

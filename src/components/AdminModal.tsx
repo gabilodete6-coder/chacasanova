@@ -18,7 +18,9 @@ import {
   Eye,
   EyeOff,
   RotateCcw,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Database,
+  RefreshCw
 } from 'lucide-react';
 
 interface AdminModalProps {
@@ -39,6 +41,8 @@ interface AdminModalProps {
   onUpdateHouseInfo: (info: HouseInfo) => void;
   onUpdateTexture: (type: 'bambu' | 'inox', newImageUrl: string) => void;
   onRemoveTexture: (type: 'bambu' | 'inox') => void;
+  onSyncSupabase?: () => Promise<void> | void;
+  isSupabaseConnected?: boolean | null;
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({
@@ -59,6 +63,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onUpdateHouseInfo,
   onUpdateTexture,
   onRemoveTexture,
+  onSyncSupabase,
+  isSupabaseConnected,
 }) => {
   // Password state
   const [passwordInput, setPasswordInput] = useState('');
@@ -1085,6 +1091,40 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     <Check className="w-4 h-4 text-[#D2B48C]" />
                     <span>Salvar Alterações</span>
                   </button>
+
+                  {/* Supabase Cloud Database Integration Info & Actions */}
+                  <div className="pt-6 mt-6 border-t border-[#BDC3C7] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-4 h-4 text-[#34495E]" />
+                        <h5 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
+                          Banco de Dados Supabase (Nuvem)
+                        </h5>
+                      </div>
+                      <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        isSupabaseConnected !== false
+                          ? 'bg-[#E8F8F5] text-[#27AE60] border border-[#27AE60]/40'
+                          : 'bg-[#FDEDEC] text-[#C0392B] border border-[#C0392B]/40'
+                      }`}>
+                        {isSupabaseConnected !== false ? '● Conectado' : '○ Offline / Local'}
+                      </span>
+                    </div>
+                    
+                    <p className="text-[11px] text-[#555] leading-relaxed">
+                      Sua aplicação está configurada para persistir reservas, presentes e categorias diretamente no Supabase (tabelas <code>presentes</code> e <code>categorias</code>) com sincronização em tempo real.
+                    </p>
+
+                    {onSyncSupabase && (
+                      <button
+                        type="button"
+                        onClick={onSyncSupabase}
+                        className="w-full py-2.5 bg-[#FAF9F6] hover:bg-[#34495E] hover:text-white border border-[#BDC3C7] text-[#1A1A1A] text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Sincronizar Lista Atual com Supabase</span>
+                      </button>
+                    )}
+                  </div>
                 </form>
               )}
 
