@@ -17,7 +17,8 @@ import {
   Unlock,
   Eye,
   EyeOff,
-  RotateCcw
+  RotateCcw,
+  Link as LinkIcon
 } from 'lucide-react';
 
 interface AdminModalProps {
@@ -82,9 +83,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   // Textures upload state
   const [targetTextureType, setTargetTextureType] = useState<'bambu' | 'inox' | null>(null);
+  const [bambuUrlInput, setBambuUrlInput] = useState(texturesConfig?.bambuImage || '');
+  const [inoxUrlInput, setInoxUrlInput] = useState(texturesConfig?.inoxImage || '');
   const [textureSuccess, setTextureSuccess] = useState('');
   const [textureError, setTextureError] = useState('');
   const textureFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setBambuUrlInput(texturesConfig?.bambuImage || '');
+    setInoxUrlInput(texturesConfig?.inoxImage || '');
+  }, [texturesConfig]);
 
   // Settings form
   const [tempHouseInfo, setTempHouseInfo] = useState<HouseInfo>(houseInfo);
@@ -214,7 +222,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     const file = e.target.files?.[0];
     if (file && targetTextureType) {
       if (!file.type.startsWith('image/')) {
-        setTextureError('Por favor selecione um arquivo de imagem válido (.jpg, .jpeg, .png).');
+        setTextureError('Por favor selecione um arquivo de imagem válido (.jpg, .jpeg, .png, .webp).');
         return;
       }
       const reader = new FileReader();
@@ -222,16 +230,42 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         const result = event.target?.result as string;
         if (result) {
           onUpdateTexture(targetTextureType, result);
-          setTextureSuccess(`Textura de ${targetTextureType === 'bambu' ? 'Bambu' : 'Inox'} atualizada e salva com sucesso!`);
+          if (targetTextureType === 'bambu') setBambuUrlInput(result);
+          if (targetTextureType === 'inox') setInoxUrlInput(result);
+          setTextureSuccess(`Textura de ${targetTextureType === 'bambu' ? 'Bambu' : 'Inox'} convertida para Base64 e salva com sucesso!`);
           setTimeout(() => setTextureSuccess(''), 3500);
         }
       };
       reader.onerror = () => {
-        setTextureError('Erro ao carregar o arquivo de imagem.');
+        setTextureError('Erro ao converter o arquivo de imagem para Data URL.');
       };
       reader.readAsDataURL(file);
     }
     setTargetTextureType(null);
+  };
+
+  const handleApplyUrl = (type: 'bambu' | 'inox') => {
+    const url = type === 'bambu' ? bambuUrlInput.trim() : inoxUrlInput.trim();
+    if (!url) {
+      setTextureError('Por favor insira um link ou URL de imagem válido.');
+      return;
+    }
+    onUpdateTexture(type, url);
+    setTextureError('');
+    setTextureSuccess(`Link da textura de ${type === 'bambu' ? 'Bambu' : 'Inox'} aplicado com sucesso!`);
+    setTimeout(() => setTextureSuccess(''), 3500);
+  };
+
+  const handleResetDefaultImage = (type: 'bambu' | 'inox') => {
+    const defaultUrl = type === 'bambu' 
+      ? './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg' 
+      : './inox.jpg';
+    onUpdateTexture(type, defaultUrl);
+    if (type === 'bambu') setBambuUrlInput(defaultUrl);
+    if (type === 'inox') setInoxUrlInput(defaultUrl);
+    setTextureError('');
+    setTextureSuccess(`Textura de ${type === 'bambu' ? 'Bambu' : 'Inox'} restaurada para a imagem padrão!`);
+    setTimeout(() => setTextureSuccess(''), 3500);
   };
 
   // Copy Full Host Reservations List
@@ -757,70 +791,112 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 4: PALETTE TEXTURES (Bambu & Inox Upload) */}
+              {/* TAB 4: PALETTE TEXTURES (Bambu & Inox Upload / URL) */}
               {activeTab === 'textures' && (
-                <div className="space-y-6 max-w-xl mx-auto">
+                <div className="space-y-6 max-w-2xl mx-auto">
                   <div className="space-y-1">
                     <h4 className="font-serif italic text-lg text-[#1A1A1A] font-semibold">
                       Texturas da Paleta de Cores (Bambu & Inox)
                     </h4>
                     <p className="text-xs text-[#555]">
-                      Faça o upload de arquivos de imagem (.jpg, .jpeg, .png) do seu dispositivo para preencher as amostras circulares de Bambu e Inox. As imagens são convertidas e salvas no armazenamento local (localStorage) do seu navegador.
+                      Personalize as texturas de <strong>Bambu / Madeira Clara</strong> e <strong>Inox / Prata</strong> fazendo o upload de uma imagem do seu dispositivo (convertida para Base64) ou inserindo uma URL pública.
                     </p>
                   </div>
 
                   {textureSuccess && (
                     <div className="p-3 bg-[#E8F8F5] border border-[#27AE60] text-[#27AE60] text-xs font-bold flex items-center gap-2">
-                      <Check className="w-4 h-4" />
+                      <Check className="w-4 h-4 shrink-0" />
                       <span>{textureSuccess}</span>
                     </div>
                   )}
 
                   {textureError && (
                     <div className="p-3 bg-[#FDEDEC] border border-[#C0392B] text-[#C0392B] text-xs font-bold flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
+                      <AlertCircle className="w-4 h-4 shrink-0" />
                       <span>{textureError}</span>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     
                     {/* Texture Card 1: Bambu */}
-                    <div className="p-4 bg-[#FAF9F6] border border-[#BDC3C7] flex flex-col items-center text-center space-y-3">
-                      <div className="w-20 h-20 rounded-full border-4 border-[#C5A059] shadow-md overflow-hidden bg-white relative flex items-center justify-center">
-                        {texturesConfig?.bambuImage ? (
-                          <img 
-                            src={texturesConfig.bambuImage} 
-                            alt="Textura de Bambu" 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div 
-                            className="w-full h-full flex items-center justify-center text-[10px] text-[#7F8C8D] font-bold uppercase tracking-wider"
-                            style={{ backgroundColor: '#D2B48C' }}
-                          >
+                    <div className="p-4 bg-[#FAF9F6] border border-[#BDC3C7] flex flex-col items-center space-y-4">
+                      {/* Swatch Preview with direct background style */}
+                      <div 
+                        className="w-20 h-20 rounded-full border-4 border-[#C5A059] shadow-md relative overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
+                        style={{
+                          backgroundColor: '#D2B48C',
+                          backgroundImage: texturesConfig?.bambuImage ? `url("${texturesConfig.bambuImage}")` : undefined,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          backgroundRepeat: 'no-repeat',
+                        }}
+                      >
+                        {!texturesConfig?.bambuImage && (
+                          <span className="text-[10px] text-[#7F8C8D] font-bold uppercase tracking-wider">
                             Cor Padrão
-                          </div>
+                          </span>
                         )}
                       </div>
                       
-                      <div>
+                      <div className="text-center">
                         <strong className="text-sm text-[#1A1A1A] block font-semibold">
                           Bambu / Madeira Clara
                         </strong>
                         <span className="text-[11px] text-[#555]">
-                          {texturesConfig?.bambuImage ? 'Foto personalizada ativa' : 'Utilizando cor suave padrão'}
+                          {texturesConfig?.bambuImage?.startsWith('data:') 
+                            ? 'Foto personalizada (Base64 local)' 
+                            : texturesConfig?.bambuImage 
+                            ? 'Imagem ativa' 
+                            : 'Utilizando cor neutra padrão'}
                         </span>
                       </div>
 
+                      {/* Action 1: Upload File */}
                       <div className="w-full space-y-2">
                         <button
                           type="button"
                           onClick={() => triggerTextureUpload('bambu')}
-                          className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs"
+                          className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer"
                         >
                           <Upload className="w-3.5 h-3.5 text-[#D2B48C]" />
-                          <span>{texturesConfig?.bambuImage ? 'Trocar Foto Bambu' : 'Carregar Imagem Bambu'}</span>
+                          <span>Carregar Foto do Aparelho</span>
+                        </button>
+                      </div>
+
+                      {/* Action 2: Link / URL Input */}
+                      <div className="w-full space-y-1.5 pt-2 border-t border-[#BDC3C7]/60">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-[#34495E] flex items-center gap-1">
+                          <LinkIcon className="w-3 h-3" />
+                          <span>Ou colar Link / URL da imagem:</span>
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={bambuUrlInput}
+                            onChange={(e) => setBambuUrlInput(e.target.value)}
+                            placeholder="https://... ou ./bambu.jpg"
+                            className="flex-1 px-2.5 py-1.5 border border-[#BDC3C7] text-xs focus:border-[#1A1A1A] focus:outline-hidden bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleApplyUrl('bambu')}
+                            className="px-3 py-1.5 bg-[#34495E] hover:bg-[#1A1A1A] text-white text-xs font-bold uppercase transition-colors shrink-0 cursor-pointer"
+                          >
+                            Aplicar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Action 3: Reset options */}
+                      <div className="w-full pt-2 border-t border-[#BDC3C7]/60 flex flex-col gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleResetDefaultImage('bambu')}
+                          className="w-full py-1 text-[11px] text-[#34495E] hover:bg-[#EAECEE] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Restaurar Imagem Padrão</span>
                         </button>
 
                         {texturesConfig?.bambuImage && (
@@ -828,54 +904,97 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                             type="button"
                             onClick={() => {
                               onRemoveTexture('bambu');
-                              setTextureSuccess('Textura de Bambu restaurada para a cor padrão!');
+                              setBambuUrlInput('');
+                              setTextureSuccess('Textura de Bambu configurada para a cor sólida padrão!');
                               setTimeout(() => setTextureSuccess(''), 3000);
                             }}
-                            className="w-full py-1.5 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors"
+                            className="w-full py-1 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
                           >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Remover foto (Usar cor padrão)</span>
+                            <Trash2 className="w-3 h-3" />
+                            <span>Remover Foto (Usar apenas cor)</span>
                           </button>
                         )}
                       </div>
                     </div>
 
                     {/* Texture Card 2: Inox */}
-                    <div className="p-4 bg-[#FAF9F6] border border-[#BDC3C7] flex flex-col items-center text-center space-y-3">
-                      <div className="w-20 h-20 rounded-full border-4 border-[#95A5A6] shadow-md overflow-hidden bg-white relative flex items-center justify-center">
-                        {texturesConfig?.inoxImage ? (
-                          <img 
-                            src={texturesConfig.inoxImage} 
-                            alt="Textura de Inox" 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div 
-                            className="w-full h-full flex items-center justify-center text-[10px] text-[#7F8C8D] font-bold uppercase tracking-wider"
-                            style={{ backgroundColor: '#BDC3C7' }}
-                          >
+                    <div className="p-4 bg-[#FAF9F6] border border-[#BDC3C7] flex flex-col items-center space-y-4">
+                      {/* Swatch Preview with direct background style */}
+                      <div 
+                        className="w-20 h-20 rounded-full border-4 border-[#95A5A6] shadow-md relative overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
+                        style={{
+                          backgroundColor: '#BDC3C7',
+                          backgroundImage: texturesConfig?.inoxImage ? `url("${texturesConfig.inoxImage}")` : undefined,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          backgroundRepeat: 'no-repeat',
+                        }}
+                      >
+                        {!texturesConfig?.inoxImage && (
+                          <span className="text-[10px] text-[#7F8C8D] font-bold uppercase tracking-wider">
                             Cor Padrão
-                          </div>
+                          </span>
                         )}
                       </div>
                       
-                      <div>
+                      <div className="text-center">
                         <strong className="text-sm text-[#1A1A1A] block font-semibold">
                           Inox / Prata
                         </strong>
                         <span className="text-[11px] text-[#555]">
-                          {texturesConfig?.inoxImage ? 'Foto personalizada ativa' : 'Utilizando cor suave padrão'}
+                          {texturesConfig?.inoxImage?.startsWith('data:') 
+                            ? 'Foto personalizada (Base64 local)' 
+                            : texturesConfig?.inoxImage 
+                            ? 'Imagem ativa' 
+                            : 'Utilizando cor neutra padrão'}
                         </span>
                       </div>
 
+                      {/* Action 1: Upload File */}
                       <div className="w-full space-y-2">
                         <button
                           type="button"
                           onClick={() => triggerTextureUpload('inox')}
-                          className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs"
+                          className="w-full py-2.5 bg-white hover:bg-[#1A1A1A] hover:text-white border border-[#BDC3C7] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-2xs cursor-pointer"
                         >
-                          <Upload className="w-3.5 h-3.5 text-[#BDC3C7]" />
-                          <span>{texturesConfig?.inoxImage ? 'Trocar Foto Inox' : 'Carregar Imagem Inox'}</span>
+                          <Upload className="w-3.5 h-3.5 text-[#95A5A6]" />
+                          <span>Carregar Foto do Aparelho</span>
+                        </button>
+                      </div>
+
+                      {/* Action 2: Link / URL Input */}
+                      <div className="w-full space-y-1.5 pt-2 border-t border-[#BDC3C7]/60">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-[#34495E] flex items-center gap-1">
+                          <LinkIcon className="w-3 h-3" />
+                          <span>Ou colar Link / URL da imagem:</span>
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={inoxUrlInput}
+                            onChange={(e) => setInoxUrlInput(e.target.value)}
+                            placeholder="https://... ou ./inox.jpg"
+                            className="flex-1 px-2.5 py-1.5 border border-[#BDC3C7] text-xs focus:border-[#1A1A1A] focus:outline-hidden bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleApplyUrl('inox')}
+                            className="px-3 py-1.5 bg-[#34495E] hover:bg-[#1A1A1A] text-white text-xs font-bold uppercase transition-colors shrink-0 cursor-pointer"
+                          >
+                            Aplicar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Action 3: Reset options */}
+                      <div className="w-full pt-2 border-t border-[#BDC3C7]/60 flex flex-col gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleResetDefaultImage('inox')}
+                          className="w-full py-1 text-[11px] text-[#34495E] hover:bg-[#EAECEE] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Restaurar Imagem Padrão</span>
                         </button>
 
                         {texturesConfig?.inoxImage && (
@@ -883,13 +1002,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                             type="button"
                             onClick={() => {
                               onRemoveTexture('inox');
-                              setTextureSuccess('Textura de Inox restaurada para a cor padrão!');
+                              setInoxUrlInput('');
+                              setTextureSuccess('Textura de Inox configurada para a cor sólida padrão!');
                               setTimeout(() => setTextureSuccess(''), 3000);
                             }}
-                            className="w-full py-1.5 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors"
+                            className="w-full py-1 text-[11px] text-[#C0392B] hover:bg-[#FDEDEC] border border-transparent font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
                           >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Remover foto (Usar cor padrão)</span>
+                            <Trash2 className="w-3 h-3" />
+                            <span>Remover Foto (Usar apenas cor)</span>
                           </button>
                         )}
                       </div>
@@ -898,7 +1018,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   </div>
 
                   <div className="bg-white p-3.5 border border-[#BDC3C7] text-xs text-[#555] leading-relaxed">
-                    💡 <strong>Como funciona:</strong> Ao carregar uma foto, o arquivo é convertido em Base64 e persistido no armazenamento local do navegador (<code>localStorage</code>). Se você não enviar nenhuma imagem ou optar por remover a foto, a amostra circular exibirá a cor suave padrão.
+                    💡 <strong>Como funciona:</strong> Ao fazer o upload de uma imagem do seu aparelho, ela é convertida diretamente para <strong>Data URL (Base64)</strong> e armazenada no <code>localStorage</code> do navegador, sendo aplicada de imediato no estilo de background dos círculos da paleta de cores. Você também pode digitar ou colar qualquer link público de imagem.
                   </div>
                 </div>
               )}

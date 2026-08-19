@@ -70,7 +70,11 @@ export function App() {
     const saved = localStorage.getItem('cha_casa_nova_textures_v2');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return {
+          bambuImage: parsed.bambuImage || initialTexturesConfig.bambuImage,
+          inoxImage: parsed.inoxImage || initialTexturesConfig.inoxImage,
+        };
       } catch (e) {
         console.error('Error loading saved textures:', e);
       }

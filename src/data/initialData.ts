@@ -1,8 +1,8 @@
 import { GiftItem, HouseInfo, InspirationPhoto, ColorSwatch, TexturesConfig } from '../types';
 
 export const initialTexturesConfig: TexturesConfig = {
-  bambuImage: '',
-  inoxImage: '',
+  bambuImage: './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg',
+  inoxImage: './inox.jpg',
 };
 
 export const initialHouseInfo: HouseInfo = {

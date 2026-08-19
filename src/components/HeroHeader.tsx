@@ -46,7 +46,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
       name: 'Bambu / Madeira Clara',
       altName: 'Bambu',
       type: 'texture',
-      textureUrl: texturesConfig?.bambuImage || '',
+      textureUrl: texturesConfig?.bambuImage || './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg',
       fallbackColor: '#D2B48C',
       borderColor: '#C5A059',
       description: 'Textura natural e aconchego',
@@ -55,7 +55,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
       name: 'Inox / Prata',
       altName: 'Inox',
       type: 'texture',
-      textureUrl: texturesConfig?.inoxImage || '',
+      textureUrl: texturesConfig?.inoxImage || './inox.jpg',
       fallbackColor: '#BDC3C7',
       borderColor: '#95A5A6',
       description: 'Acabamentos e eletros',
@@ -159,7 +159,14 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
                 ) : (
                   <div 
                     className="w-12 h-12 rounded-full shadow-inner mb-2.5 border-2 shrink-0 overflow-hidden relative bg-[#FAF9F6] transition-transform duration-200 hover:scale-105"
-                    style={{ borderColor: item.borderColor || '#BDC3C7' }}
+                    style={{ 
+                      borderColor: item.borderColor || '#BDC3C7',
+                      backgroundColor: item.fallbackColor,
+                      backgroundImage: item.textureUrl ? `url("${item.textureUrl}")` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                    }}
                     title={item.name}
                   >
                     {item.textureUrl ? (
@@ -169,10 +176,6 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
                         className="w-full h-full object-cover rounded-full"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
-                          const parent = (e.target as HTMLElement).parentElement;
-                          if (parent) {
-                            parent.style.backgroundColor = item.fallbackColor;
-                          }
                         }}
                       />
                     ) : (
