@@ -39,7 +39,11 @@ import { Footer } from './components/Footer';
 import { 
   FilterX, 
   Check, 
-  Info
+  Info,
+  Loader2,
+  RefreshCw,
+  AlertCircle,
+  Gift
 } from 'lucide-react';
 
 const ADMIN_PASSWORD = '149610';
@@ -48,6 +52,7 @@ export function App() {
   // 1. Core State directly from Supabase (Zero mock fallback)
   const [gifts, setGifts] = useState<GiftItem[]>([]);
   const [isLoadingGifts, setIsLoadingGifts] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<string[]>([
     'Cozinha',
@@ -111,61 +116,63 @@ export function App() {
   // References
   const giftsSectionRef = useRef<HTMLDivElement>(null);
 
-  // Load directly from Supabase table 'presentes' on mount and subscribe to Realtime channel
-  useEffect(() => {
-    let isMounted = true;
+  // Function to load all data from Supabase with robust try/catch
+  const loadDataFromSupabase = async () => {
+    setIsLoadingGifts(true);
+    setLoadError(null);
 
-    async function loadDataFromSupabase() {
-      setIsLoadingGifts(true);
+    try {
+      // Direct query to table 'presentes' executed on page mount or retry
+      const { data: presentesData, error: presentesError } = await supabase
+        .from('presentes')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (presentesError) {
+        console.warn('Erro ao carregar presentes do Supabase:', presentesError.message);
+        setIsSupabaseConnected(false);
+        setLoadError(`Não foi possível carregar os presentes: ${presentesError.message}`);
+        setGifts([]);
+      } else {
+        setIsSupabaseConnected(true);
+        setLoadError(null);
+        setGifts(presentesData ? presentesData.map(mapRowToGift) : []);
+      }
+
+      // Also fetch categories from Supabase if present
       try {
-        // Direct query to table 'presentes' as requested
-        const { data: presentesData, error: presentesError } = await supabase
-          .from('presentes')
-          .select('*')
-          .order('id', { ascending: true });
-
-        if (!isMounted) return;
-
-        if (presentesError) {
-          console.warn('Erro ao carregar presentes do Supabase:', presentesError.message);
-          setIsSupabaseConnected(false);
-          setGifts([]);
-        } else {
-          setIsSupabaseConnected(true);
-          setGifts(presentesData ? presentesData.map(mapRowToGift) : []);
-        }
-
-        // Also fetch categories from Supabase if present
         const supabaseCategories = await fetchCategoriasFromSupabase();
-
-        if (!isMounted) return;
-
         if (supabaseCategories && supabaseCategories.length > 0) {
           setCategories(supabaseCategories);
         }
+      } catch (catErr) {
+        console.warn('Aviso ao buscar categorias do Supabase:', catErr);
+      }
 
-        // Also fetch textures config from Supabase
+      // Also fetch textures config from Supabase
+      try {
         const supabaseTextures = await fetchTexturesFromSupabase();
-        if (!isMounted) return;
         if (supabaseTextures && (supabaseTextures.bambuImage || supabaseTextures.inoxImage)) {
           setTexturesConfig((prev) => ({
             bambuImage: supabaseTextures.bambuImage || prev.bambuImage,
             inoxImage: supabaseTextures.inoxImage || prev.inoxImage,
           }));
         }
-      } catch (err) {
-        console.error('Erro na conexão com Supabase:', err);
-        if (isMounted) {
-          setIsSupabaseConnected(false);
-          setGifts([]);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingGifts(false);
-        }
+      } catch (textErr) {
+        console.warn('Aviso ao buscar texturas do Supabase:', textErr);
       }
+    } catch (err: any) {
+      console.error('Erro na conexão com Supabase:', err);
+      setIsSupabaseConnected(false);
+      setLoadError(err?.message || 'Ocorreu uma instabilidade na conexão com o servidor. Por favor, tente novamente.');
+      setGifts([]);
+    } finally {
+      setIsLoadingGifts(false);
     }
+  };
 
+  // Load directly from Supabase table 'presentes' once on mount and subscribe to Realtime channel
+  useEffect(() => {
     loadDataFromSupabase();
 
     // Subscribe to real-time changes in table 'presentes' and 'categorias'
@@ -214,7 +221,6 @@ export function App() {
       .subscribe();
 
     return () => {
-      isMounted = false;
       supabase.removeChannel(channel);
     };
   }, []);
@@ -594,23 +600,79 @@ export function App() {
                 myReservationsCount={myReservedGiftsList.length}
               />
 
-              {/* Gifts Loading / Empty / Content */}
+              {/* Gifts Loading / Error / Empty / Content */}
               {isLoadingGifts ? (
-                <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
-                  {[1, 2, 3, 4, 5, 6].map((idx) => (
-                    <div
-                      key={idx}
-                      className="bg-white border border-[#BDC3C7] p-2.5 sm:p-5 space-y-2.5 sm:space-y-4 animate-pulse shadow-xs"
-                    >
-                      <div className="w-full aspect-4/3 bg-[#FAF9F6] border border-[#BDC3C7]/40" />
-                      <div className="space-y-1.5 sm:space-y-2">
-                        <div className="w-12 sm:w-20 h-2.5 sm:h-3 bg-[#EAECEE]" />
-                        <div className="w-3/4 h-3.5 sm:h-5 bg-[#EAECEE]" />
-                        <div className="w-full h-2.5 sm:h-3 bg-[#FAF9F6]" />
-                      </div>
-                      <div className="w-full h-8 sm:h-10 bg-[#FAF9F6] border border-[#BDC3C7]" />
+                <div className="space-y-6">
+                  {/* Dedicated Loading Spinner Box */}
+                  <div className="py-12 px-6 text-center bg-white border border-[#BDC3C7] shadow-xs flex flex-col items-center justify-center space-y-3">
+                    <div className="w-12 h-12 rounded-full border-2 border-[#D2B48C] border-t-transparent animate-spin flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 text-[#1A1A1A] animate-spin" />
                     </div>
-                  ))}
+                    <div className="space-y-1">
+                      <h3 className="font-serif italic text-xl sm:text-2xl text-[#1A1A1A] font-semibold">
+                        Carregando presentes...
+                      </h3>
+                      <p className="text-xs text-[#7F8C8D]">
+                        Buscando a lista atualizada no banco de dados.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Skeleton placeholder grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6 opacity-60">
+                    {[1, 2, 3, 4, 5, 6].map((idx) => (
+                      <div
+                        key={idx}
+                        className="bg-white border border-[#BDC3C7] p-2.5 sm:p-5 space-y-2.5 sm:space-y-4 animate-pulse shadow-xs"
+                      >
+                        <div className="w-full aspect-4/3 bg-[#FAF9F6] border border-[#BDC3C7]/40" />
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <div className="w-12 sm:w-20 h-2.5 sm:h-3 bg-[#EAECEE]" />
+                          <div className="w-3/4 h-3.5 sm:h-5 bg-[#EAECEE]" />
+                          <div className="w-full h-2.5 sm:h-3 bg-[#FAF9F6]" />
+                        </div>
+                        <div className="w-full h-8 sm:h-10 bg-[#FAF9F6] border border-[#BDC3C7]" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : loadError ? (
+                /* Error state with retry button */
+                <div className="py-14 px-6 text-center bg-white border border-[#E74C3C]/40 p-8 shadow-xs space-y-4 max-w-lg mx-auto">
+                  <div className="w-14 h-14 bg-[#FDEDEC] border border-[#E74C3C] text-[#C0392B] mx-auto flex items-center justify-center">
+                    <AlertCircle className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-serif italic text-2xl text-[#1A1A1A]">
+                      Não foi possível carregar os presentes
+                    </h3>
+                    <p className="text-xs text-[#555] leading-relaxed">
+                      {loadError}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => loadDataFromSupabase()}
+                    className="inline-flex items-center gap-2 bg-[#1A1A1A] text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#34495E] transition-all shadow-xs cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Tentar Novamente</span>
+                  </button>
+                </div>
+              ) : gifts.length === 0 ? (
+                /* Truly empty list from Supabase (0 items total) */
+                <div className="py-16 text-center bg-white border border-[#BDC3C7] p-8 shadow-xs space-y-4 max-w-md mx-auto">
+                  <div className="w-14 h-14 bg-[#FAF9F6] border border-[#BDC3C7] text-[#34495E] mx-auto flex items-center justify-center">
+                    <Gift className="w-7 h-7 text-[#D2B48C]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-serif italic text-2xl text-[#1A1A1A]">
+                      Nenhum presente disponível no momento
+                    </h3>
+                    <p className="text-xs text-[#555] leading-relaxed">
+                      A lista de presentes ainda não possui itens cadastrados ou está sendo atualizada pelos noivos.
+                    </p>
+                  </div>
                 </div>
               ) : filteredGifts.length === 0 ? (
                 <div className="py-16 text-center bg-white border border-[#BDC3C7] p-8 shadow-xs space-y-4">
