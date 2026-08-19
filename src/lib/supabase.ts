@@ -528,6 +528,9 @@ export async function saveTexturesToSupabase(textures: TexturesConfig): Promise<
   }
 }
 
+const DEFAULT_SUPABASE_BAMBU_TEXTURE = 'https://flnytwosxztpzkzxjjia.supabase.co/storage/v1/object/public/textura/9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg';
+const DEFAULT_SUPABASE_INOX_TEXTURE = 'https://flnytwosxztpzkzxjjia.supabase.co/storage/v1/object/public/textura/unnamed.png';
+
 /**
  * Fetch Textures configuration from Supabase table 'configuracoes'
  */
@@ -540,15 +543,27 @@ export async function fetchTexturesFromSupabase(): Promise<TexturesConfig | null
       .maybeSingle();
 
     if (error || !data) {
-      return null;
+      return {
+        bambuImage: DEFAULT_SUPABASE_BAMBU_TEXTURE,
+        inoxImage: DEFAULT_SUPABASE_INOX_TEXTURE,
+      };
     }
 
+    const bambuRaw = data.bambu_image || data.bambu_url || data.bambuImage;
+    const inoxRaw = data.inox_image || data.inox_url || data.inoxImage;
+
+    const bambu = (bambuRaw && !bambuRaw.startsWith('./')) ? bambuRaw : DEFAULT_SUPABASE_BAMBU_TEXTURE;
+    const inox = (inoxRaw && !inoxRaw.startsWith('./')) ? inoxRaw : DEFAULT_SUPABASE_INOX_TEXTURE;
+
     return {
-      bambuImage: data.bambu_image || data.bambu_url || data.bambuImage || undefined,
-      inoxImage: data.inox_image || data.inox_url || data.inoxImage || undefined,
+      bambuImage: bambu,
+      inoxImage: inox,
     };
   } catch {
-    return null;
+    return {
+      bambuImage: DEFAULT_SUPABASE_BAMBU_TEXTURE,
+      inoxImage: DEFAULT_SUPABASE_INOX_TEXTURE,
+    };
   }
 }
 

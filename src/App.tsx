@@ -69,9 +69,11 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const bambu = (parsed.bambuImage && !parsed.bambuImage.startsWith('./')) ? parsed.bambuImage : initialTexturesConfig.bambuImage;
+        const inox = (parsed.inoxImage && !parsed.inoxImage.startsWith('./')) ? parsed.inoxImage : initialTexturesConfig.inoxImage;
         return {
-          bambuImage: parsed.bambuImage || initialTexturesConfig.bambuImage,
-          inoxImage: parsed.inoxImage || initialTexturesConfig.inoxImage,
+          bambuImage: bambu,
+          inoxImage: inox,
         };
       } catch (e) {
         console.error('Error loading saved textures:', e);
@@ -158,8 +160,8 @@ export function App() {
         const tex = texturesRes.value;
         if (tex.bambuImage || tex.inoxImage) {
           setTexturesConfig((prev) => ({
-            bambuImage: tex.bambuImage || prev.bambuImage,
-            inoxImage: tex.inoxImage || prev.inoxImage,
+            bambuImage: (tex.bambuImage && !tex.bambuImage.startsWith('./')) ? tex.bambuImage : (prev.bambuImage || initialTexturesConfig.bambuImage),
+            inoxImage: (tex.inoxImage && !tex.inoxImage.startsWith('./')) ? tex.inoxImage : (prev.inoxImage || initialTexturesConfig.inoxImage),
           }));
         }
       }

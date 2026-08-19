@@ -1,8 +1,11 @@
 import { GiftItem, HouseInfo, InspirationPhoto, ColorSwatch, TexturesConfig } from '../types';
 
+export const DEFAULT_TEXTURE_BAMBU = 'https://flnytwosxztpzkzxjjia.supabase.co/storage/v1/object/public/textura/9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg';
+export const DEFAULT_TEXTURE_INOX = 'https://flnytwosxztpzkzxjjia.supabase.co/storage/v1/object/public/textura/unnamed.png';
+
 export const initialTexturesConfig: TexturesConfig = {
-  bambuImage: './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg',
-  inoxImage: './inox.jpg',
+  bambuImage: DEFAULT_TEXTURE_BAMBU,
+  inoxImage: DEFAULT_TEXTURE_INOX,
 };
 
 export const initialHouseInfo: HouseInfo = {

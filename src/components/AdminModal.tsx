@@ -293,8 +293,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   const handleResetDefaultImage = (type: 'bambu' | 'inox') => {
     const defaultUrl = type === 'bambu' 
-      ? './9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg' 
-      : './inox.jpg';
+      ? 'https://flnytwosxztpzkzxjjia.supabase.co/storage/v1/object/public/textura/9741231-textura-de-madeira-de-bambu-natural-gratis-foto.jpg' 
+      : 'https://flnytwosxztpzkzxjjia.supabase.co/storage/v1/object/public/textura/unnamed.png';
     onUpdateTexture(type, defaultUrl);
     handleCancelPendingTexture(type);
     setTextureError('');
