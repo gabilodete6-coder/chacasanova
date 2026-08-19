@@ -20,7 +20,9 @@ import {
   RotateCcw,
   Link as LinkIcon,
   Database,
-  RefreshCw
+  RefreshCw,
+  User,
+  Heart
 } from 'lucide-react';
 
 interface AdminModalProps {
@@ -744,11 +746,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                               {gift.name}
                             </h5>
                             {gift.isReserved ? (
-                              <span className="text-xs text-[#27AE60] font-semibold block">
-                                Reservado por: <strong>{gift.reservedBy || 'Convidado'}</strong>
-                              </span>
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#E8F8F5] border border-[#27AE60] text-[#1A1A1A] text-xs font-medium shadow-2xs">
+                                  <User className="w-3.5 h-3.5 text-[#27AE60] shrink-0" />
+                                  <span>
+                                    Reservado por: <strong className="text-[#1A1A1A] font-bold">{gift.reservedBy || 'Convidado'}</strong>
+                                  </span>
+                                </span>
+                              </div>
                             ) : (
-                              <span className="text-xs text-[#7F8C8D] block">Disponível</span>
+                              <span className="text-[11px] text-[#7F8C8D] inline-flex items-center gap-1 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#27AE60]"></span>
+                                Disponível
+                              </span>
                             )}
                           </div>
                         </div>
