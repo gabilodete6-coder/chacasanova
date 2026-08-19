@@ -312,7 +312,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         type="file"
         ref={textureFileInputRef}
         onChange={handleTextureFileChange}
-        accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+        accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml,image/*"
         className="hidden"
       />
 
@@ -569,10 +569,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     />
                   </div>
 
-                  {/* Upload de Imagem (Permite selecionar foto: .jpeg, .jpg, .png) */}
+                  {/* Upload de Imagem (Permite selecionar foto: .jpeg, .jpg, .png, .webp, .svg) */}
                   <div className="space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
-                      Fotos do Presente (.jpg, .jpeg, .png)
+                      Fotos do Presente (.jpg, .jpeg, .png, .webp, .svg)
                     </label>
                     
                     <input
@@ -580,7 +580,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       ref={giftFileInputRef}
                       onChange={handleGiftImageUpload}
                       multiple
-                      accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                      accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml,image/*"
                       className="hidden"
                     />
 
@@ -593,7 +593,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         Clique para escolher foto(s) do seu computador
                       </p>
                       <p className="text-[11px] text-[#7F8C8D] mt-1">
-                        Formatos aceitos: JPG, JPEG e PNG (Você pode selecionar mais de uma foto)
+                        Formatos aceitos: JPG, JPEG, PNG, WEBP e SVG (Você pode selecionar mais de uma foto)
                       </p>
                     </div>
 
@@ -805,7 +805,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       Texturas da Paleta de Cores (Bambu & Inox)
                     </h4>
                     <p className="text-xs text-[#555]">
-                      Personalize as texturas de <strong>Bambu</strong> e <strong>Inox / Prata</strong> fazendo o upload de uma imagem do seu dispositivo (convertida para Base64) ou inserindo uma URL pública.
+                      Personalize as texturas de <strong>Bambu</strong> e <strong>Inox</strong> fazendo o upload de uma imagem do seu dispositivo (convertida para Base64) ou inserindo uma URL pública (.jpg, .jpeg, .png, .webp, .svg).
                     </p>
                   </div>
 
@@ -838,7 +838,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           backgroundRepeat: 'no-repeat',
                         }}
                       >
-                        {!texturesConfig?.bambuImage && (
+                        {texturesConfig?.bambuImage ? (
+                          <img
+                            src={texturesConfig.bambuImage}
+                            alt="Textura Bambu"
+                            className="w-full h-full object-cover rounded-full pointer-events-none"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
                           <span className="text-[10px] text-[#7F8C8D] font-bold uppercase tracking-wider">
                             Cor Padrão
                           </span>
@@ -936,7 +945,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           backgroundRepeat: 'no-repeat',
                         }}
                       >
-                        {!texturesConfig?.inoxImage && (
+                        {texturesConfig?.inoxImage ? (
+                          <img
+                            src={texturesConfig.inoxImage}
+                            alt="Textura Inox"
+                            className="w-full h-full object-cover rounded-full pointer-events-none"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
                           <span className="text-[10px] text-[#7F8C8D] font-bold uppercase tracking-wider">
                             Cor Padrão
                           </span>
@@ -945,7 +963,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       
                       <div className="text-center">
                         <strong className="text-sm text-[#1A1A1A] block font-semibold">
-                          Inox / Prata
+                          Inox
                         </strong>
                         <span className="text-[11px] text-[#555]">
                           {texturesConfig?.inoxImage?.startsWith('data:') 

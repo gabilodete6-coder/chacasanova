@@ -587,19 +587,19 @@ export function App() {
 
               {/* Gifts Loading / Empty / Content */}
               {isLoadingGifts ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
                   {[1, 2, 3, 4, 5, 6].map((idx) => (
                     <div
                       key={idx}
-                      className="bg-white border border-[#BDC3C7] p-5 space-y-4 animate-pulse shadow-xs"
+                      className="bg-white border border-[#BDC3C7] p-2.5 sm:p-5 space-y-2.5 sm:space-y-4 animate-pulse shadow-xs"
                     >
-                      <div className="w-full h-48 bg-[#FAF9F6] border border-[#BDC3C7]/40" />
-                      <div className="space-y-2">
-                        <div className="w-20 h-3 bg-[#EAECEE]" />
-                        <div className="w-3/4 h-5 bg-[#EAECEE]" />
-                        <div className="w-full h-3 bg-[#FAF9F6]" />
+                      <div className="w-full aspect-4/3 bg-[#FAF9F6] border border-[#BDC3C7]/40" />
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <div className="w-12 sm:w-20 h-2.5 sm:h-3 bg-[#EAECEE]" />
+                        <div className="w-3/4 h-3.5 sm:h-5 bg-[#EAECEE]" />
+                        <div className="w-full h-2.5 sm:h-3 bg-[#FAF9F6]" />
                       </div>
-                      <div className="w-full h-10 bg-[#FAF9F6] border border-[#BDC3C7]" />
+                      <div className="w-full h-8 sm:h-10 bg-[#FAF9F6] border border-[#BDC3C7]" />
                     </div>
                   ))}
                 </div>
@@ -622,14 +622,14 @@ export function App() {
                       setStatusFilter('all');
                       setSearchQuery('');
                     }}
-                    className="inline-flex items-center gap-2 bg-[#1A1A1A] text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#34495E] transition-all shadow-xs"
+                    className="inline-flex items-center gap-2 bg-[#1A1A1A] text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#34495E] transition-all shadow-xs cursor-pointer"
                   >
                     <span>Limpar Filtros e Ver Todos</span>
                   </button>
                 </div>
               ) : (
-                /* Gifts Cards Responsive Grid (2 to 3 columns on desktop, 1 on mobile) */
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                /* Gifts Cards Responsive Grid (2 columns on mobile and tablet, 3 on xl) */
+                <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
                   {filteredGifts.map((gift) => (
                     <GiftCard
                       key={gift.id}

@@ -52,7 +52,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
       description: 'Textura natural e aconchego',
     },
     {
-      name: 'Inox / Prata',
+      name: 'Inox',
       altName: 'Inox',
       type: 'texture',
       textureUrl: texturesConfig?.inoxImage || './inox.jpg',

@@ -50,7 +50,7 @@ export const paletteColors: ColorSwatch[] = [
     description: 'Aconchego natural e acolhimento',
   },
   {
-    name: 'Inox / Prata',
+    name: 'Inox',
     colorCode: '#BDC3C7',
     textColor: '#1A1A1A',
     borderColor: '#95A5A6',
