@@ -32,6 +32,25 @@ export function mapRowToGift(row: any): GiftItem {
     ? [row.imagem || row.image]
     : [];
 
+  const isReserved = Boolean(
+    row.reserved === true ||
+    row.reserved === 'true' ||
+    row.is_reserved === true ||
+    row.is_reserved === 'true' ||
+    row.reservado === true ||
+    row.reservado === 'true' ||
+    row.isReserved === true ||
+    row.isReserved === 'true'
+  );
+
+  const reservedBy =
+    row.reserved_by ||
+    row.reservedBy ||
+    row.reservado_por ||
+    row.reservadopor ||
+    row.reserved_to ||
+    undefined;
+
   return {
     id: String(row.id ?? ''),
     name: row.nome || row.name || row.titulo || row.title || 'Presente',
@@ -39,10 +58,10 @@ export function mapRowToGift(row: any): GiftItem {
     image: row.imagem || row.image || row.foto || row.image_url || imagesList[0] || '',
     images: imagesList,
     description: row.descricao || row.description || '',
-    isReserved: Boolean(row.reservado ?? row.is_reserved ?? row.isReserved ?? false),
-    reservedBy: row.reservado_por || row.reserved_by || row.reservedBy || undefined,
-    reservedAt: row.reservado_em || row.reserved_at || row.reservedAt || undefined,
-    reservationMessage: row.mensagem_reserva || row.reservation_message || row.mensagem || undefined,
+    isReserved,
+    reservedBy: isReserved ? (reservedBy || 'Convidado') : undefined,
+    reservedAt: row.reserved_at || row.reservado_em || row.reservedAt || undefined,
+    reservationMessage: row.reservation_message || row.mensagem_reserva || row.mensagem || undefined,
     isCustomAdded: Boolean(row.is_custom_added ?? row.custom ?? false),
   };
 }
@@ -175,6 +194,7 @@ export async function fetchHouseInfoFromSupabase(): Promise<HouseInfo | null> {
 
 /**
  * Reserve or unreserve a gift in Supabase table 'presentes'
+ * Sets reserved = true (and reserved_by = guestName) with robust schema fallbacks
  */
 export async function updateGiftReservationInSupabase(
   giftId: string,
@@ -184,55 +204,69 @@ export async function updateGiftReservationInSupabase(
   reservationMessage?: string
 ): Promise<boolean> {
   try {
-    // We try to update with standard fields
-    const updates: Record<string, any> = {
-      reservado: isReserved,
-      is_reserved: isReserved,
-      reservado_por: isReserved ? (reservedBy || null) : null,
+    const numericId = Number(giftId);
+    const idToUse = !isNaN(numericId) && String(numericId) === giftId ? numericId : giftId;
+
+    // Strategy 1: User requested exact schema (reserved + reserved_by)
+    const payloadPrimary: Record<string, any> = {
+      reserved: isReserved,
       reserved_by: isReserved ? (reservedBy || null) : null,
-      reservado_em: isReserved ? (reservedAt || new Date().toISOString()) : null,
-      reserved_at: isReserved ? (reservedAt || new Date().toISOString()) : null,
-      mensagem_reserva: isReserved ? (reservationMessage || null) : null,
-      reservation_message: isReserved ? (reservationMessage || null) : null,
     };
+    if (reservedAt) payloadPrimary.reserved_at = isReserved ? reservedAt : null;
+    if (reservationMessage) payloadPrimary.reservation_message = isReserved ? reservationMessage : null;
 
-    // First attempt: direct update
-    const { error } = await supabase
+    let res = await supabase
       .from('presentes')
-      .update(updates)
-      .eq('id', giftId);
+      .update(payloadPrimary)
+      .eq('id', idToUse);
 
-    if (!error) return true;
+    if (!res.error) return true;
 
-    // If some columns do not exist, try with minimal PT-BR or EN fields
-    console.warn('Tentando formato alternativo de colunas para reserva no Supabase...');
-    const minimalUpdatesPT: Record<string, any> = {
-      reservado: isReserved,
-      reservado_por: isReserved ? (reservedBy || null) : null,
-      reservado_em: isReserved ? (reservedAt || new Date().toISOString()) : null,
-      mensagem_reserva: isReserved ? (reservationMessage || null) : null,
-    };
-    
-    const { error: errorPT } = await supabase
+    // Strategy 2: Only reserved boolean
+    res = await supabase
       .from('presentes')
-      .update(minimalUpdatesPT)
-      .eq('id', giftId);
+      .update({ reserved: isReserved })
+      .eq('id', idToUse);
 
-    if (!errorPT) return true;
+    if (!res.error) return true;
 
-    const minimalUpdatesEN: Record<string, any> = {
-      is_reserved: isReserved,
-      reserved_by: isReserved ? (reservedBy || null) : null,
-      reserved_at: isReserved ? (reservedAt || new Date().toISOString()) : null,
-      reservation_message: isReserved ? (reservationMessage || null) : null,
-    };
-
-    const { error: errorEN } = await supabase
+    // Strategy 3: is_reserved + reserved_by
+    res = await supabase
       .from('presentes')
-      .update(minimalUpdatesEN)
-      .eq('id', giftId);
+      .update({
+        is_reserved: isReserved,
+        reserved_by: isReserved ? (reservedBy || null) : null,
+      })
+      .eq('id', idToUse);
 
-    return !errorEN;
+    if (!res.error) return true;
+
+    // Strategy 4: is_reserved only
+    res = await supabase
+      .from('presentes')
+      .update({ is_reserved: isReserved })
+      .eq('id', idToUse);
+
+    if (!res.error) return true;
+
+    // Strategy 5: reservado + reservado_por
+    res = await supabase
+      .from('presentes')
+      .update({
+        reservado: isReserved,
+        reservado_por: isReserved ? (reservedBy || null) : null,
+      })
+      .eq('id', idToUse);
+
+    if (!res.error) return true;
+
+    // Strategy 6: reservado only
+    res = await supabase
+      .from('presentes')
+      .update({ reservado: isReserved })
+      .eq('id', idToUse);
+
+    return !res.error;
   } catch (err) {
     console.error('Erro ao atualizar reserva no Supabase:', err);
     return false;
@@ -244,57 +278,60 @@ export async function updateGiftReservationInSupabase(
  */
 export async function addGiftToSupabase(gift: GiftItem): Promise<boolean> {
   try {
-    const payload = {
-      id: gift.id,
+    const numericId = Number(gift.id);
+    const idToUse = !isNaN(numericId) && String(numericId) === gift.id ? numericId : gift.id;
+
+    // Strategy 1: User requested schema (nome, categoria, imagem, descricao, reserved, reserved_by)
+    const payload1 = {
+      id: idToUse,
       nome: gift.name,
-      name: gift.name,
       categoria: gift.category,
-      category: gift.category,
       imagem: gift.image,
-      image: gift.image,
-      imagens: gift.images || [gift.image],
-      images: gift.images || [gift.image],
       descricao: gift.description || '',
-      description: gift.description || '',
-      reservado: gift.isReserved || false,
-      is_reserved: gift.isReserved || false,
-      reservado_por: gift.reservedBy || null,
+      reserved: gift.isReserved || false,
       reserved_by: gift.reservedBy || null,
-      reservado_em: gift.reservedAt || null,
-      reserved_at: gift.reservedAt || null,
-      mensagem_reserva: gift.reservationMessage || null,
-      reservation_message: gift.reservationMessage || null,
     };
+    const res1 = await supabase.from('presentes').upsert([payload1]);
+    if (!res1.error) return true;
 
-    const { error } = await supabase
-      .from('presentes')
-      .upsert([payload]);
-
-    if (!error) return true;
-
-    // Fallback minimal PT
-    const payloadPT = {
-      id: gift.id,
-      nome: gift.name,
-      categoria: gift.category,
-      imagem: gift.image,
-      descricao: gift.description || '',
-      reservado: false,
-    };
-    const { error: errPT } = await supabase.from('presentes').upsert([payloadPT]);
-    if (!errPT) return true;
-
-    // Fallback minimal EN
-    const payloadEN = {
-      id: gift.id,
+    // Strategy 2: English column names (name, category, image, description, reserved, reserved_by)
+    const payload2 = {
+      id: idToUse,
       name: gift.name,
       category: gift.category,
       image: gift.image,
       description: gift.description || '',
-      is_reserved: false,
+      reserved: gift.isReserved || false,
+      reserved_by: gift.reservedBy || null,
     };
-    const { error: errEN } = await supabase.from('presentes').upsert([payloadEN]);
-    return !errEN;
+    const res2 = await supabase.from('presentes').upsert([payload2]);
+    if (!res2.error) return true;
+
+    // Strategy 3: Portuguese with 'reservado'
+    const payload3 = {
+      id: idToUse,
+      nome: gift.name,
+      categoria: gift.category,
+      imagem: gift.image,
+      descricao: gift.description || '',
+      reservado: gift.isReserved || false,
+      reservado_por: gift.reservedBy || null,
+    };
+    const res3 = await supabase.from('presentes').upsert([payload3]);
+    if (!res3.error) return true;
+
+    // Strategy 4: English with 'is_reserved'
+    const payload4 = {
+      id: idToUse,
+      name: gift.name,
+      category: gift.category,
+      image: gift.image,
+      description: gift.description || '',
+      is_reserved: gift.isReserved || false,
+      reserved_by: gift.reservedBy || null,
+    };
+    const res4 = await supabase.from('presentes').upsert([payload4]);
+    return !res4.error;
   } catch (err) {
     console.error('Erro ao adicionar presente no Supabase:', err);
     return false;
@@ -306,12 +343,23 @@ export async function addGiftToSupabase(gift: GiftItem): Promise<boolean> {
  */
 export async function deleteGiftFromSupabase(giftId: string): Promise<boolean> {
   try {
+    const numericId = Number(giftId);
+    const idToUse = !isNaN(numericId) && String(numericId) === giftId ? numericId : giftId;
+
     const { error } = await supabase
+      .from('presentes')
+      .delete()
+      .eq('id', idToUse);
+
+    if (!error) return true;
+
+    // Retry with string id if numeric was tried or vice versa
+    const { error: error2 } = await supabase
       .from('presentes')
       .delete()
       .eq('id', giftId);
 
-    return !error;
+    return !error2;
   } catch (err) {
     console.error('Erro ao deletar presente no Supabase:', err);
     return false;

@@ -6,9 +6,9 @@ export const initialTexturesConfig: TexturesConfig = {
 };
 
 export const initialHouseInfo: HouseInfo = {
-  coupleNames: 'Larissa & Matheus',
-  eventDate: 'Sábado, 24 de Outubro • 16h',
-  location: 'Nosso Novo Cantinho • São Paulo, SP',
+  coupleNames: 'Gabrielle & Wehington',
+  eventDate: 'Sábado, 17 de Outubro • 16h',
+  location: 'Condomínio Jade • R. Geraldo Pereira de Brito, 75',
   welcomeMessage: 'Estamos muito felizes em compartilhar esse momento tão especial com você! Preparamos esta lista com muito carinho para equipar nosso novo lar. Fique à vontade para escolher o item que desejar e comprar onde preferir. Deixamos abaixo a nossa paleta de cores, caso queira segui-la ao escolher o seu presente.',
 };
 

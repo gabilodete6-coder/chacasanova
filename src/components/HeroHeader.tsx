@@ -69,7 +69,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
         {/* Top Tag */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#FFFFFF] border border-[#BDC3C7] text-[#1A1A1A] text-[11px] font-bold uppercase tracking-widest mb-4 shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-[#D2B48C]" />
-          <span>Chá de Casa Nova</span>
+          <span>CHÁ DE CASA NOVA</span>
         </div>
 
         {/* 1. Main Title: "Lar doce lar" */}
@@ -79,7 +79,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
         
         {/* Couple Names */}
         <p className="font-serif text-xl sm:text-2xl text-[#34495E] italic mb-4 font-normal">
-          {houseInfo.coupleNames}
+          Gabrielle & Wehington
         </p>
 
         {/* Subtle decorative divider */}
@@ -89,11 +89,11 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
         <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 text-xs text-[#34495E] mb-6 font-medium">
           <div className="flex items-center gap-1.5 bg-white px-3.5 py-2 border border-[#BDC3C7] shadow-2xs">
             <Calendar className="w-4 h-4 text-[#D2B48C]" />
-            <span>{houseInfo.eventDate}</span>
+            <span>Sábado, 17 de Outubro • 16h</span>
           </div>
           <div className="flex items-center gap-1.5 bg-white px-3.5 py-2 border border-[#BDC3C7] shadow-2xs">
             <MapPin className="w-4 h-4 text-[#D2B48C]" />
-            <span>{houseInfo.location}</span>
+            <span>Condomínio Jade • R. Geraldo Pereira de Brito, 75</span>
           </div>
         </div>
 

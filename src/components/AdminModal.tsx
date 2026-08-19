@@ -100,10 +100,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setInoxUrlInput(texturesConfig?.inoxImage || '');
   }, [texturesConfig]);
 
-  // Settings form
-  const [tempHouseInfo, setTempHouseInfo] = useState<HouseInfo>(houseInfo);
-  const [settingsSuccess, setSettingsSuccess] = useState('');
-
   // Host summary copy state
   const [copiedSummary, setCopiedSummary] = useState(false);
 
@@ -123,10 +119,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       setNewCategory(categories[0]);
     }
   }, [categories, newCategory]);
-
-  useEffect(() => {
-    setTempHouseInfo(houseInfo);
-  }, [houseInfo]);
 
   if (!isOpen) return null;
 
@@ -291,14 +283,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       setCopiedSummary(true);
       setTimeout(() => setCopiedSummary(false), 3000);
     });
-  };
-
-  // Save Settings
-  const handleSaveSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    onUpdateHouseInfo(tempHouseInfo);
-    setSettingsSuccess('Informações atualizadas com sucesso!');
-    setTimeout(() => setSettingsSuccess(''), 3000);
   };
 
   return (
@@ -1047,71 +1031,71 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 5: EVENT SETTINGS */}
+              {/* TAB 5: EVENT INFO (FIXED) & SUPABASE DATABASE */}
               {activeTab === 'settings' && (
-                <form onSubmit={handleSaveSettings} className="space-y-4 max-w-xl mx-auto">
+                <div className="space-y-6 max-w-xl mx-auto">
                   <div className="space-y-1">
                     <h4 className="font-serif italic text-lg text-[#1A1A1A] font-semibold">
-                      Informações do Evento
+                      Informações do Evento (Fixadas)
                     </h4>
                     <p className="text-xs text-[#555]">
-                      Altere os nomes dos noivos, a data e a localização do Chá de Casa Nova.
+                      Os dados principais do Chá de Casa Nova estão fixados diretamente no código da aplicação.
                     </p>
                   </div>
 
-                  {settingsSuccess && (
-                    <div className="p-3 bg-[#E8F8F5] border border-[#27AE60] text-[#27AE60] text-xs font-bold flex items-center gap-2">
-                      <Check className="w-4 h-4" />
-                      <span>{settingsSuccess}</span>
+                  {/* Read-only Event Details Card */}
+                  <div className="bg-[#FAF9F6] border border-[#BDC3C7] p-4 sm:p-5 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#BDC3C7]/60">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-[#34495E]">
+                        Dados Fixos
+                      </span>
+                      <span className="px-2 py-0.5 bg-[#E8F8F5] text-[#27AE60] border border-[#27AE60]/40 text-[10px] font-bold uppercase tracking-wider">
+                        Fixado no Código
+                      </span>
                     </div>
-                  )}
 
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
-                      Nomes do Casal
-                    </label>
-                    <input
-                      type="text"
-                      value={tempHouseInfo.coupleNames}
-                      onChange={(e) => setTempHouseInfo({ ...tempHouseInfo, coupleNames: e.target.value })}
-                      className="w-full p-3 bg-[#FAF9F6] border border-[#BDC3C7] focus:border-[#1A1A1A] focus:bg-white text-sm text-[#1A1A1A] focus:outline-none"
-                    />
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <span className="text-[#7F8C8D] uppercase tracking-wider text-[10px] font-bold block">
+                          Título / Badge:
+                        </span>
+                        <strong className="text-[#1A1A1A]">CHÁ DE CASA NOVA • Lar doce lar</strong>
+                      </div>
+
+                      <div>
+                        <span className="text-[#7F8C8D] uppercase tracking-wider text-[10px] font-bold block">
+                          Nomes do Casal:
+                        </span>
+                        <strong className="text-[#1A1A1A]">Gabrielle & Wehington</strong>
+                      </div>
+
+                      <div>
+                        <span className="text-[#7F8C8D] uppercase tracking-wider text-[10px] font-bold block">
+                          Data e Horário:
+                        </span>
+                        <strong className="text-[#1A1A1A]">Sábado, 17 de Outubro • 16h</strong>
+                      </div>
+
+                      <div>
+                        <span className="text-[#7F8C8D] uppercase tracking-wider text-[10px] font-bold block">
+                          Localização:
+                        </span>
+                        <strong className="text-[#1A1A1A]">Condomínio Jade • R. Geraldo Pereira de Brito, 75</strong>
+                      </div>
+
+                      <div>
+                        <span className="text-[#7F8C8D] uppercase tracking-wider text-[10px] font-bold block">
+                          Texto de Boas-Vindas:
+                        </span>
+                        <p className="text-[#555] italic leading-relaxed pt-1">
+                          &ldquo;Estamos muito felizes em compartilhar esse momento tão especial com você! Preparamos esta lista com muito carinho para equipar nosso novo lar. Fique à vontade para escolher o item que desejar e comprar onde preferir. Deixamos abaixo a nossa paleta de cores, caso queira segui-la ao escolher o seu presente.&rdquo;
+                        </p>
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
-                      Data e Horário
-                    </label>
-                    <input
-                      type="text"
-                      value={tempHouseInfo.eventDate}
-                      onChange={(e) => setTempHouseInfo({ ...tempHouseInfo, eventDate: e.target.value })}
-                      className="w-full p-3 bg-[#FAF9F6] border border-[#BDC3C7] focus:border-[#1A1A1A] focus:bg-white text-sm text-[#1A1A1A] focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
-                      Localização
-                    </label>
-                    <input
-                      type="text"
-                      value={tempHouseInfo.location}
-                      onChange={(e) => setTempHouseInfo({ ...tempHouseInfo, location: e.target.value })}
-                      className="w-full p-3 bg-[#FAF9F6] border border-[#BDC3C7] focus:border-[#1A1A1A] focus:bg-white text-sm text-[#1A1A1A] focus:outline-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-[#1A1A1A] hover:bg-[#34495E] text-white text-xs font-bold uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2"
-                  >
-                    <Check className="w-4 h-4 text-[#D2B48C]" />
-                    <span>Salvar Alterações</span>
-                  </button>
 
                   {/* Supabase Cloud Database Integration Info & Actions */}
-                  <div className="pt-6 mt-6 border-t border-[#BDC3C7] space-y-3">
+                  <div className="pt-4 border-t border-[#BDC3C7] space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Database className="w-4 h-4 text-[#34495E]" />
@@ -1129,21 +1113,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </div>
                     
                     <p className="text-[11px] text-[#555] leading-relaxed">
-                      Sua aplicação está configurada para persistir reservas, presentes e categorias diretamente no Supabase (tabelas <code>presentes</code> e <code>categorias</code>) com sincronização em tempo real.
+                      Sua aplicação está configurada para persistir reservas, presentes e categorias diretamente no Supabase (tabela <code>presentes</code> com <code>reserved</code> e <code>reserved_by</code>) com sincronização em tempo real.
                     </p>
 
                     {onSyncSupabase && (
                       <button
                         type="button"
                         onClick={onSyncSupabase}
-                        className="w-full py-2.5 bg-[#FAF9F6] hover:bg-[#34495E] hover:text-white border border-[#BDC3C7] text-[#1A1A1A] text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2.5 bg-[#FAF9F6] hover:bg-[#34495E] hover:text-white border border-[#BDC3C7] text-[#1A1A1A] text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                         <span>Sincronizar Lista Atual com Supabase</span>
                       </button>
                     )}
                   </div>
-                </form>
+                </div>
               )}
 
             </div>

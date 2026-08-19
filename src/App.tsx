@@ -133,20 +133,13 @@ export function App() {
           setGifts(presentesData ? presentesData.map(mapRowToGift) : []);
         }
 
-        // Also fetch categories and houseInfo from Supabase if present
-        const [supabaseCategories, supabaseHouseInfo] = await Promise.all([
-          fetchCategoriasFromSupabase(),
-          fetchHouseInfoFromSupabase(),
-        ]);
+        // Also fetch categories from Supabase if present
+        const supabaseCategories = await fetchCategoriasFromSupabase();
 
         if (!isMounted) return;
 
         if (supabaseCategories && supabaseCategories.length > 0) {
           setCategories(supabaseCategories);
-        }
-
-        if (supabaseHouseInfo && supabaseHouseInfo.coupleNames) {
-          setHouseInfo(supabaseHouseInfo);
         }
       } catch (err) {
         console.error('Erro na conexão com Supabase:', err);
