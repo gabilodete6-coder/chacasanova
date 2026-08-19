@@ -182,9 +182,17 @@ export async function fetchHouseInfoFromSupabase(): Promise<HouseInfo | null> {
   }
 }
 
+export interface ReservationResult {
+  success: boolean;
+  alreadyReserved?: boolean;
+  reservedBy?: string;
+  errorMessage?: string;
+}
+
 /**
- * Reserve or unreserve a gift in Supabase table 'presentes'
- * Sets reserved = true / false exclusively
+ * Reserve or unreserve a gift in Supabase table 'presentes'.
+ * When isReserved is true (attempting to reserve), it checks if the item is still available (reserved === false).
+ * If another guest reserved it in the meantime, it returns { success: false, alreadyReserved: true }.
  */
 export async function updateGiftReservationInSupabase(
   giftId: string,
@@ -192,10 +200,37 @@ export async function updateGiftReservationInSupabase(
   reservedBy?: string,
   reservedAt?: string,
   reservationMessage?: string
-): Promise<boolean> {
+): Promise<ReservationResult> {
   try {
     const numericId = Number(giftId);
     const idToUse = !isNaN(numericId) && String(numericId) === giftId ? numericId : giftId;
+
+    // Concurrency check when attempting to reserve (isReserved === true)
+    if (isReserved) {
+      const { data: checkData, error: checkError } = await supabase
+        .from('presentes')
+        .select('reserved, reserved_by')
+        .eq('id', idToUse)
+        .maybeSingle();
+
+      if (!checkError && checkData) {
+        const currentlyReserved = Boolean(
+          checkData.reserved === true ||
+          checkData.reserved === 'true' ||
+          checkData.reserved === 1 ||
+          checkData.reserved === '1'
+        );
+
+        if (currentlyReserved) {
+          return {
+            success: false,
+            alreadyReserved: true,
+            reservedBy: checkData.reserved_by || 'Outro Convidado',
+            errorMessage: 'Ops! Este presente acabou de ser reservado por outra pessoa.',
+          };
+        }
+      }
+    }
 
     // Primary update: reserved and reserved_by
     const payload: Record<string, any> = {
@@ -209,23 +244,58 @@ export async function updateGiftReservationInSupabase(
       payload.reservation_message = isReserved ? reservationMessage : null;
     }
 
-    const { error } = await supabase
+    let query = supabase
       .from('presentes')
       .update(payload)
       .eq('id', idToUse);
 
-    if (!error) return true;
+    if (isReserved) {
+      // Atomic condition: only update if still unreserved
+      query = query.eq('reserved', false);
+    }
 
-    // Fallback: update only 'reserved' column if reserved_by does not exist
-    const { error: errorOnlyReserved } = await supabase
+    const { data: updateData, error } = await query.select();
+
+    if (!error) {
+      if (isReserved && updateData && updateData.length === 0) {
+        // No row updated because reserved is already true in DB
+        return {
+          success: false,
+          alreadyReserved: true,
+          errorMessage: 'Ops! Este presente acabou de ser reservado por outra pessoa.',
+        };
+      }
+      return { success: true };
+    }
+
+    // Fallback: update only 'reserved' column if extra columns do not exist
+    let fallbackQuery = supabase
       .from('presentes')
       .update({ reserved: isReserved })
       .eq('id', idToUse);
 
-    return !errorOnlyReserved;
-  } catch (err) {
+    if (isReserved) {
+      fallbackQuery = fallbackQuery.eq('reserved', false);
+    }
+
+    const { data: fallbackData, error: errorOnlyReserved } = await fallbackQuery.select();
+
+    if (isReserved && fallbackData && fallbackData.length === 0) {
+      return {
+        success: false,
+        alreadyReserved: true,
+        errorMessage: 'Ops! Este presente acabou de ser reservado por outra pessoa.',
+      };
+    }
+
+    if (errorOnlyReserved) {
+      return { success: false, errorMessage: errorOnlyReserved.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
     console.error('Erro ao atualizar reserva no Supabase:', err);
-    return false;
+    return { success: false, errorMessage: err?.message };
   }
 }
 

@@ -116,50 +116,52 @@ export function App() {
   // References
   const giftsSectionRef = useRef<HTMLDivElement>(null);
 
-  // Function to load all data from Supabase with robust try/catch
+  // Function to load all data from Supabase with robust try/catch and parallel queries
   const loadDataFromSupabase = async () => {
     setIsLoadingGifts(true);
     setLoadError(null);
 
     try {
-      // Direct query to table 'presentes' executed on page mount or retry
-      const { data: presentesData, error: presentesError } = await supabase
-        .from('presentes')
-        .select('*')
-        .order('id', { ascending: true });
+      // Parallel execution for maximum performance on page load / F5
+      const [presentesRes, categoriasRes, texturesRes] = await Promise.allSettled([
+        supabase.from('presentes').select('*').order('id', { ascending: true }),
+        fetchCategoriasFromSupabase(),
+        fetchTexturesFromSupabase(),
+      ]);
 
-      if (presentesError) {
-        console.warn('Erro ao carregar presentes do Supabase:', presentesError.message);
-        setIsSupabaseConnected(false);
-        setLoadError(`Não foi possível carregar os presentes: ${presentesError.message}`);
-        setGifts([]);
-      } else {
-        setIsSupabaseConnected(true);
-        setLoadError(null);
-        setGifts(presentesData ? presentesData.map(mapRowToGift) : []);
-      }
-
-      // Also fetch categories from Supabase if present
-      try {
-        const supabaseCategories = await fetchCategoriasFromSupabase();
-        if (supabaseCategories && supabaseCategories.length > 0) {
-          setCategories(supabaseCategories);
+      // 1. Handle Presentes
+      if (presentesRes.status === 'fulfilled') {
+        const { data: presentesData, error: presentesError } = presentesRes.value;
+        if (presentesError) {
+          console.warn('Erro ao carregar presentes do Supabase:', presentesError.message);
+          setIsSupabaseConnected(false);
+          setLoadError(`Não foi possível carregar os presentes: ${presentesError.message}`);
+          setGifts([]);
+        } else {
+          setIsSupabaseConnected(true);
+          setLoadError(null);
+          setGifts(presentesData ? presentesData.map(mapRowToGift) : []);
         }
-      } catch (catErr) {
-        console.warn('Aviso ao buscar categorias do Supabase:', catErr);
+      } else {
+        setIsSupabaseConnected(false);
+        setLoadError('Falha ao conectar com o banco de presentes. Verifique sua conexão.');
+        setGifts([]);
       }
 
-      // Also fetch textures config from Supabase
-      try {
-        const supabaseTextures = await fetchTexturesFromSupabase();
-        if (supabaseTextures && (supabaseTextures.bambuImage || supabaseTextures.inoxImage)) {
+      // 2. Handle Categorias
+      if (categoriasRes.status === 'fulfilled' && categoriasRes.value && categoriasRes.value.length > 0) {
+        setCategories(categoriasRes.value);
+      }
+
+      // 3. Handle Textures
+      if (texturesRes.status === 'fulfilled' && texturesRes.value) {
+        const tex = texturesRes.value;
+        if (tex.bambuImage || tex.inoxImage) {
           setTexturesConfig((prev) => ({
-            bambuImage: supabaseTextures.bambuImage || prev.bambuImage,
-            inoxImage: supabaseTextures.inoxImage || prev.inoxImage,
+            bambuImage: tex.bambuImage || prev.bambuImage,
+            inoxImage: tex.inoxImage || prev.inoxImage,
           }));
         }
-      } catch (textErr) {
-        console.warn('Aviso ao buscar texturas do Supabase:', textErr);
       }
     } catch (err: any) {
       console.error('Erro na conexão com Supabase:', err);
@@ -242,7 +244,7 @@ export function App() {
     setToastMessage({ text, type });
     setTimeout(() => {
       setToastMessage(null);
-    }, 4000);
+    }, 4500);
   };
 
   const scrollToGifts = () => {
@@ -251,20 +253,51 @@ export function App() {
     }
   };
 
-  // 5. Reservation Handlers
+  // 5. Reservation Handlers with simultaneous access verification
   const handleOpenReserveModal = (gift: GiftItem) => {
     setSelectedGiftForReserve(gift);
     setIsReserveModalOpen(true);
   };
 
   const handleConfirmReservation = async (name: string, message?: string) => {
-    if (!selectedGiftForReserve) return;
+    if (!selectedGiftForReserve) return { success: false };
     const targetGift = selectedGiftForReserve;
     const reservedAt = new Date().toISOString();
 
     setGuestName(name);
 
-    // Update gift in list
+    // Call Supabase with concurrency check
+    const result = await updateGiftReservationInSupabase(
+      targetGift.id,
+      true,
+      name,
+      reservedAt,
+      message
+    );
+
+    if (result.alreadyReserved || !result.success) {
+      // The gift was already reserved by another user concurrently
+      const warningText = result.errorMessage || 'Ops! Este presente acabou de ser reservado por outra pessoa.';
+      
+      // Update local item state to show as reserved
+      setGifts((prevGifts) =>
+        prevGifts.map((g) => {
+          if (g.id === targetGift.id) {
+            return {
+              ...g,
+              isReserved: true,
+              reservedBy: result.reservedBy || 'Outro Convidado',
+            };
+          }
+          return g;
+        })
+      );
+
+      showToast(warningText, 'info');
+      return { success: false, error: warningText };
+    }
+
+    // Reservation succeeded
     setGifts((prevGifts) =>
       prevGifts.map((g) => {
         if (g.id === targetGift.id) {
@@ -296,15 +329,7 @@ export function App() {
     });
 
     showToast(`O presente "${targetGift.name}" foi reservado com sucesso!`, 'success');
-
-    // Async Supabase update on table 'presentes'
-    await updateGiftReservationInSupabase(
-      targetGift.id,
-      true,
-      name,
-      reservedAt,
-      message
-    );
+    return { success: true };
   };
 
   const handleCancelReservation = async (giftId: string) => {

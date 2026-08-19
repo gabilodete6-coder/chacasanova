@@ -109,13 +109,13 @@ export const GiftCard: React.FC<GiftCardProps> = ({
         </div>
 
         {/* Content Section */}
-        <div className="p-2.5 sm:p-4 md:p-5 space-y-1 sm:space-y-2">
-          <h3 className="text-sm sm:text-lg md:text-xl font-serif italic text-[#1A1A1A] font-bold leading-snug sm:leading-tight line-clamp-2 min-h-[2.4rem] sm:min-h-[3.2rem]">
+        <div className="p-3 sm:p-4 md:p-5 space-y-1 sm:space-y-2">
+          <h3 className="text-base sm:text-xl md:text-2xl font-serif italic text-[#1A1A1A] font-bold leading-tight sm:leading-snug line-clamp-2 min-h-[2.8rem] sm:min-h-[3.6rem]">
             {gift.name}
           </h3>
 
           {gift.description && (
-            <p className="text-[10px] sm:text-xs text-[#555] line-clamp-2 leading-tight sm:leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-[#555] line-clamp-2 leading-snug sm:leading-relaxed">
               {gift.description}
             </p>
           )}

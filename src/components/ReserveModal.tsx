@@ -6,7 +6,7 @@ interface ReserveModalProps {
   gift: GiftItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (guestName: string, message?: string) => void;
+  onConfirm: (guestName: string, message?: string) => Promise<boolean | { success: boolean; error?: string } | void> | void;
   initialGuestName?: string;
 }
 
@@ -45,7 +45,7 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
     onClose();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guestName.trim()) {
       setError('Por favor, informe seu nome para confirmar a reserva.');
@@ -55,10 +55,16 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
     setIsSubmitting(true);
     setError('');
 
-    setTimeout(() => {
-      onConfirm(guestName.trim());
+    try {
+      const result = await onConfirm(guestName.trim());
+      if (result && typeof result === 'object' && result.success === false) {
+        setError(result.error || 'Ops! Este presente acabou de ser reservado por outra pessoa.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Ops! Ocorreu um erro ao processar a reserva. Tente novamente.');
+    } finally {
       setIsSubmitting(false);
-    }, 250);
+    }
   };
 
   return (
