@@ -103,29 +103,111 @@ export function giftToDbPayload(gift: Partial<GiftItem>) {
   return payload;
 }
 
+export interface FetchPresentesResult {
+  data: any[] | null;
+  error: any | null;
+  isTimeout: boolean;
+}
+
 /**
- * Fetch all gifts from Supabase table 'presentes'
+ * Detects whether an error was caused by a query timeout (e.g. Postgres code 57014 or statement timeout)
  */
-export async function fetchPresentesFromSupabase(): Promise<GiftItem[] | null> {
+export function isStatementTimeoutError(err: any): boolean {
+  if (!err) return false;
+  const msg = String(err?.message || err?.details || err?.hint || err?.error_description || err || '').toLowerCase();
+  const code = String(err?.code || '');
+  return (
+    code === '57014' ||
+    msg.includes('canceling statement due to statement timeout') ||
+    msg.includes('statement timeout') ||
+    msg.includes('statement_timeout') ||
+    msg.includes('query timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('timeout') ||
+    err?.status === 504 ||
+    (err?.status === 500 && msg.includes('timeout'))
+  );
+}
+
+/**
+ * Fetch all gifts from Supabase table 'presentes' with an automatic retry after 1s
+ * on failure, error 500, or timeout before surfacing an error to the caller.
+ */
+export async function fetchPresentesWithRetry(): Promise<FetchPresentesResult> {
+  // Tentativa 1
   try {
-    const { data, error } = await supabase
+    const res1 = await supabase
       .from('presentes')
       .select('*')
       .order('id', { ascending: true });
 
-    if (error) {
-      console.warn('Aviso ao buscar presentes do Supabase:', error.message);
-      return null;
+    if (!res1.error && res1.data) {
+      return { data: res1.data, error: null, isTimeout: false };
     }
 
-    if (data && Array.isArray(data)) {
-      return data.map(mapRowToGift);
+    const firstError = res1.error;
+    console.warn('Tentativa 1 ao buscar presentes falhou. Tentando novamente em 1 segundo...', firstError?.message);
+
+    // Espera exatamente 1 segundo antes de tentar novamente (conforme item 1)
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Tentativa 2 (Retry automático)
+    const res2 = await supabase
+      .from('presentes')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (!res2.error && res2.data) {
+      return { data: res2.data, error: null, isTimeout: false };
     }
-    return [];
-  } catch (err) {
-    console.error('Erro na conexão com Supabase (presentes):', err);
-    return null;
+
+    const finalError = res2.error || firstError;
+    return {
+      data: null,
+      error: finalError,
+      isTimeout: isStatementTimeoutError(finalError),
+    };
+  } catch (err: any) {
+    console.warn('Exceção na tentativa 1. Tentando novamente em 1 segundo...', err?.message);
+
+    // Espera 1 segundo antes de tentar novamente
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    try {
+      const res2 = await supabase
+        .from('presentes')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (!res2.error && res2.data) {
+        return { data: res2.data, error: null, isTimeout: false };
+      }
+
+      const finalError = res2.error || err;
+      return {
+        data: null,
+        error: finalError,
+        isTimeout: isStatementTimeoutError(finalError),
+      };
+    } catch (err2: any) {
+      return {
+        data: null,
+        error: err2,
+        isTimeout: isStatementTimeoutError(err2),
+      };
+    }
   }
+}
+
+/**
+ * Fetch all gifts from Supabase table 'presentes'
+ */
+export async function fetchPresentesFromSupabase(): Promise<GiftItem[] | null> {
+  const result = await fetchPresentesWithRetry();
+  if (result.data && Array.isArray(result.data)) {
+    return result.data.map(mapRowToGift);
+  }
+  return null;
 }
 
 /**

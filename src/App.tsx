@@ -13,6 +13,8 @@ import {
 } from './data/initialData';
 import { 
   fetchPresentesFromSupabase, 
+  fetchPresentesWithRetry,
+  isStatementTimeoutError,
   fetchCategoriasFromSupabase, 
   fetchHouseInfoFromSupabase,
   fetchTexturesFromSupabase,
@@ -117,67 +119,83 @@ export function App() {
 
   // References
   const giftsSectionRef = useRef<HTMLDivElement>(null);
+  const isFetchingRef = useRef(false);
+  const initialMountFiredRef = useRef(false);
 
-  // Function to load all data from Supabase with robust try/catch and parallel queries
-  const loadDataFromSupabase = async () => {
+  // Function to load all data from Supabase with auto-retry, friendly timeout message, and single-dispatch guard
+  const loadDataFromSupabase = async (force: boolean = false) => {
+    // Evita múltiplos disparos simultâneos ou concorrentes (Requisito 3)
+    if (isFetchingRef.current && !force) {
+      return;
+    }
+
+    isFetchingRef.current = true;
     setIsLoadingGifts(true);
     setLoadError(null);
 
     try {
-      // Parallel execution for maximum performance on page load / F5
-      const [presentesRes, categoriasRes, texturesRes] = await Promise.allSettled([
-        supabase.from('presentes').select('*').order('id', { ascending: true }),
-        fetchCategoriasFromSupabase(),
-        fetchTexturesFromSupabase(),
-      ]);
+      // 1. Busca principal da tabela 'presentes' com retry automático após 1s em caso de falha/timeout (Requisito 1)
+      const presentesRes = await fetchPresentesWithRetry();
 
-      // 1. Handle Presentes
-      if (presentesRes.status === 'fulfilled') {
-        const { data: presentesData, error: presentesError } = presentesRes.value;
-        if (presentesError) {
-          console.warn('Erro ao carregar presentes do Supabase:', presentesError.message);
-          setIsSupabaseConnected(false);
-          setLoadError(`Não foi possível carregar os presentes: ${presentesError.message}`);
-          setGifts([]);
+      if (presentesRes.error || !presentesRes.data) {
+        setIsSupabaseConnected(false);
+        setGifts([]);
+
+        // 2. Mensagem amigável ao usuário sem expor erros técnicos (Requisito 2)
+        if (presentesRes.isTimeout || isStatementTimeoutError(presentesRes.error)) {
+          setLoadError('Conexão temporariamente lenta. Clique no botão abaixo para tentar novamente.');
         } else {
-          setIsSupabaseConnected(true);
-          setLoadError(null);
-          setGifts(presentesData ? presentesData.map(mapRowToGift) : []);
+          setLoadError('Conexão temporariamente lenta. Clique no botão abaixo para tentar novamente.');
         }
       } else {
-        setIsSupabaseConnected(false);
-        setLoadError('Falha ao conectar com o banco de presentes. Verifique sua conexão.');
-        setGifts([]);
+        setIsSupabaseConnected(true);
+        setLoadError(null);
+        setGifts(presentesRes.data.map(mapRowToGift));
       }
 
-      // 2. Handle Categorias
-      if (categoriasRes.status === 'fulfilled' && categoriasRes.value && categoriasRes.value.length > 0) {
-        setCategories(categoriasRes.value);
-      }
+      // 2. Busca secundária assíncrona/não-bloqueante de categorias e texturas para não sobrecarregar a conexão
+      fetchCategoriasFromSupabase()
+        .then((cats) => {
+          if (cats && cats.length > 0) {
+            setCategories(cats);
+          }
+        })
+        .catch((err) => console.warn('Aviso categorias:', err));
 
-      // 3. Handle Textures
-      if (texturesRes.status === 'fulfilled' && texturesRes.value) {
-        const tex = texturesRes.value;
-        if (tex.bambuImage || tex.inoxImage) {
-          setTexturesConfig((prev) => ({
-            bambuImage: (tex.bambuImage && !tex.bambuImage.startsWith('./')) ? tex.bambuImage : (prev.bambuImage || initialTexturesConfig.bambuImage),
-            inoxImage: (tex.inoxImage && !tex.inoxImage.startsWith('./')) ? tex.inoxImage : (prev.inoxImage || initialTexturesConfig.inoxImage),
-          }));
-        }
-      }
+      fetchTexturesFromSupabase()
+        .then((tex) => {
+          if (tex && (tex.bambuImage || tex.inoxImage)) {
+            setTexturesConfig((prev) => ({
+              bambuImage: (tex.bambuImage && !tex.bambuImage.startsWith('./')) ? tex.bambuImage : (prev.bambuImage || initialTexturesConfig.bambuImage),
+              inoxImage: (tex.inoxImage && !tex.inoxImage.startsWith('./')) ? tex.inoxImage : (prev.inoxImage || initialTexturesConfig.inoxImage),
+            }));
+          }
+        })
+        .catch((err) => console.warn('Aviso texturas:', err));
     } catch (err: any) {
       console.error('Erro na conexão com Supabase:', err);
       setIsSupabaseConnected(false);
-      setLoadError(err?.message || 'Ocorreu uma instabilidade na conexão com o servidor. Por favor, tente novamente.');
       setGifts([]);
+
+      // Mensagem amigável (Requisito 2)
+      if (isStatementTimeoutError(err)) {
+        setLoadError('Conexão temporariamente lenta. Clique no botão abaixo para tentar novamente.');
+      } else {
+        setLoadError('Conexão temporariamente lenta. Clique no botão abaixo para tentar novamente.');
+      }
     } finally {
       setIsLoadingGifts(false);
+      isFetchingRef.current = false;
     }
   };
 
   // Load directly from Supabase table 'presentes' once on mount and subscribe to Realtime channel
   useEffect(() => {
-    loadDataFromSupabase();
+    // Garante que a requisição inicial rode apenas 1 única vez na montagem da tela (Requisito 3)
+    if (!initialMountFiredRef.current) {
+      initialMountFiredRef.current = true;
+      loadDataFromSupabase();
+    }
 
     // Subscribe to real-time changes in table 'presentes' and 'categorias'
     const channel = supabase
@@ -679,7 +697,7 @@ export function App() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => loadDataFromSupabase()}
+                    onClick={() => loadDataFromSupabase(true)}
                     className="inline-flex items-center gap-2 bg-[#1A1A1A] text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#34495E] transition-all shadow-xs cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
