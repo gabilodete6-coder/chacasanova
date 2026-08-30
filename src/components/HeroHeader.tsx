@@ -162,10 +162,6 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
                     style={{ 
                       borderColor: item.borderColor || '#BDC3C7',
                       backgroundColor: item.fallbackColor,
-                      backgroundImage: item.textureUrl ? `url("${item.textureUrl}")` : undefined,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat',
                     }}
                     title={item.name}
                   >
@@ -173,6 +169,8 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({
                       <img
                         src={item.textureUrl}
                         alt={item.altName || item.name}
+                        loading="eager"
+                        decoding="async"
                         className="w-full h-full object-cover rounded-full"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';

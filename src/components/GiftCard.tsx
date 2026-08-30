@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GiftItem } from '../types';
-import { Check, Heart, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Check, Heart, ChevronLeft, ChevronRight, X, Gift } from 'lucide-react';
 
 interface GiftCardProps {
   gift: GiftItem;
   isMyReservation: boolean;
+  priority?: boolean;
   onReserve: (gift: GiftItem) => void;
   onCancelReservation: (giftId: string) => void;
 }
@@ -12,14 +13,63 @@ interface GiftCardProps {
 export const GiftCard: React.FC<GiftCardProps> = ({
   gift,
   isMyReservation,
+  priority = false,
   onReserve,
   onCancelReservation,
 }) => {
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [isInView, setIsInView] = useState(priority);
+
+  const cardRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   // Compile list of images for this gift
   const allImages = gift.images && gift.images.length > 0 ? gift.images : [gift.image];
   const hasMultipleImages = allImages.length > 1;
+
+  // IntersectionObserver to load images only when approaching the viewport (350px margin)
+  useEffect(() => {
+    if (priority) {
+      setIsInView(true);
+      return;
+    }
+
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      setIsInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '350px 0px' }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [priority]);
+
+  // Check if image is already cached in memory by the browser
+  useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
+  }, [isInView, currentImgIndex]);
+
+  // Reset loading status when cycling through photos
+  useEffect(() => {
+    setIsLoaded(false);
+    setHasError(false);
+  }, [currentImgIndex]);
 
   const handlePrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -33,6 +83,7 @@ export const GiftCard: React.FC<GiftCardProps> = ({
 
   return (
     <div 
+      ref={cardRef}
       id={`gift-card-${gift.id}`}
       className={`group bg-white border border-[#BDC3C7] overflow-hidden flex flex-col justify-between transition-all duration-200 hover:border-[#1A1A1A] hover:shadow-md ${
         gift.isReserved 
@@ -43,14 +94,43 @@ export const GiftCard: React.FC<GiftCardProps> = ({
       }`}
     >
       <div>
-        {/* Image Container with multiple photo support */}
+        {/* Image Container with fixed aspect ratio to prevent CLS layout shift */}
         <div className="relative aspect-4/3 bg-[#FAF9F6] border-b border-[#BDC3C7] overflow-hidden">
-          <img
-            src={allImages[currentImgIndex] || gift.image}
-            alt={gift.name}
-            loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-103"
-          />
+          
+          {/* Subtle loading placeholder matching the system's design while image is loading */}
+          {!isLoaded && !hasError && (
+            <div className="absolute inset-0 bg-[#FAF9F6] flex items-center justify-center animate-pulse">
+              <div className="w-8 h-8 rounded-full border border-[#BDC3C7]/40 flex items-center justify-center text-[#D2B48C]/60">
+                <Gift className="w-4 h-4" />
+              </div>
+            </div>
+          )}
+
+          {/* Graceful error state if image fails */}
+          {hasError ? (
+            <div className="absolute inset-0 bg-[#FAF9F6] flex flex-col items-center justify-center p-3 text-center">
+              <Gift className="w-6 h-6 text-[#D2B48C]/70 mb-1" />
+              <span className="text-[9px] uppercase tracking-wider font-semibold text-[#7F8C8D]">
+                Imagem indisponível
+              </span>
+            </div>
+          ) : (
+            isInView && (
+              <img
+                ref={imgRef}
+                src={allImages[currentImgIndex] || gift.image}
+                alt={gift.name}
+                loading={priority ? 'eager' : 'lazy'}
+                decoding="async"
+                fetchPriority={priority ? 'high' : 'low'}
+                onLoad={() => setIsLoaded(true)}
+                onError={() => setHasError(true)}
+                className={`w-full h-full object-cover transition-opacity duration-300 group-hover:scale-103 ${
+                  isLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            )
+          )}
 
           {/* Multiple images controls */}
           {hasMultipleImages && (

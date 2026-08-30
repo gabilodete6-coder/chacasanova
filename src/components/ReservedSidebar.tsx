@@ -93,6 +93,8 @@ export const ReservedSidebar: React.FC<ReservedSidebarProps> = ({
                     <img
                       src={gift.image}
                       alt={gift.name}
+                      loading="lazy"
+                      decoding="async"
                       className="w-11 h-11 object-cover border border-[#BDC3C7] shrink-0"
                     />
                     <div className="min-w-0">

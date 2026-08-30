@@ -141,6 +141,8 @@ export const MyReservationsModal: React.FC<MyReservationsModalProps> = ({
                       <img
                         src={gift.image}
                         alt={gift.name}
+                        loading="lazy"
+                        decoding="async"
                         className="w-14 h-14 object-cover border border-[#BDC3C7] shrink-0"
                       />
                       <div className="min-w-0">

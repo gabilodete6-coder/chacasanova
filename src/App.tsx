@@ -564,6 +564,49 @@ export function App() {
     });
   }, [gifts, activeCategory, statusFilter, searchQuery, myReservedGiftIds]);
 
+  // Progressive image and card loading strategy: render initial 12 items, expand seamlessly on scroll
+  const INITIAL_BATCH_SIZE = 12;
+  const BATCH_INCREMENT = 12;
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_BATCH_SIZE);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+
+  // Reset visible items count when filters or search change so top results are immediate
+  useEffect(() => {
+    setVisibleCount(INITIAL_BATCH_SIZE);
+  }, [activeCategory, statusFilter, searchQuery]);
+
+  // Seamlessly load more items into the DOM when the user scrolls near the end of the current batch
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return;
+
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      setVisibleCount(filteredGifts.length);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => {
+            if (prev < filteredGifts.length) {
+              return Math.min(prev + BATCH_INCREMENT, filteredGifts.length);
+            }
+            return prev;
+          });
+        }
+      },
+      { rootMargin: '450px 0px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filteredGifts.length, visibleCount]);
+
+  const displayedGifts = useMemo(() => {
+    return filteredGifts.slice(0, visibleCount);
+  }, [filteredGifts, visibleCount]);
+
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] flex flex-col font-sans selection:bg-[#D2B48C] selection:text-[#1A1A1A]">
       
@@ -745,17 +788,25 @@ export function App() {
                 </div>
               ) : (
                 /* Gifts Cards Responsive Grid (2 columns on mobile and tablet, 3 on xl) */
-                <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
-                  {filteredGifts.map((gift) => (
-                    <GiftCard
-                      key={gift.id}
-                      gift={gift}
-                      isMyReservation={myReservedGiftIds.has(gift.id)}
-                      onReserve={handleOpenReserveModal}
-                      onCancelReservation={handleCancelReservation}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
+                    {displayedGifts.map((gift, index) => (
+                      <GiftCard
+                        key={gift.id}
+                        gift={gift}
+                        priority={index < 6}
+                        isMyReservation={myReservedGiftIds.has(gift.id)}
+                        onReserve={handleOpenReserveModal}
+                        onCancelReservation={handleCancelReservation}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Progressive loading sentinel for auto-loading next batch smoothly */}
+                  {visibleCount < filteredGifts.length && (
+                    <div ref={loadMoreSentinelRef} className="h-2 w-full mt-4" aria-hidden="true" />
+                  )}
+                </>
               )}
             </div>
 

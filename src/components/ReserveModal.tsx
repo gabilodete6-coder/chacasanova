@@ -111,6 +111,7 @@ export const ReserveModal: React.FC<ReserveModalProps> = ({
             <img 
               src={gift.image} 
               alt={gift.name} 
+              decoding="async"
               className="w-16 h-16 object-cover border border-[#BDC3C7] shrink-0" 
             />
             <div className="min-w-0">
