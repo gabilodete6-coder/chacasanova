@@ -130,6 +130,12 @@ export function isStatementTimeoutError(err: any): boolean {
 }
 
 /**
+ * Columns required by the front-end to display cards and manage reservations
+ * Avoids transferring unused or bloated columns
+ */
+export const PRESENTES_SELECT_COLUMNS = 'id, nome, name, categoria, category, descricao, description, imagem, image, imagens, images, reserved, reserved_by, reserved_at, reservation_message';
+
+/**
  * Fetch all gifts from Supabase table 'presentes' with an automatic retry after 1s
  * on failure, error 500, or timeout before surfacing an error to the caller.
  */
@@ -138,7 +144,7 @@ export async function fetchPresentesWithRetry(): Promise<FetchPresentesResult> {
   try {
     const res1 = await supabase
       .from('presentes')
-      .select('*')
+      .select(PRESENTES_SELECT_COLUMNS)
       .order('id', { ascending: true });
 
     if (!res1.error && res1.data) {
@@ -154,7 +160,7 @@ export async function fetchPresentesWithRetry(): Promise<FetchPresentesResult> {
     // Tentativa 2 (Retry automático)
     const res2 = await supabase
       .from('presentes')
-      .select('*')
+      .select(PRESENTES_SELECT_COLUMNS)
       .order('id', { ascending: true });
 
     if (!res2.error && res2.data) {
@@ -176,7 +182,7 @@ export async function fetchPresentesWithRetry(): Promise<FetchPresentesResult> {
     try {
       const res2 = await supabase
         .from('presentes')
-        .select('*')
+        .select(PRESENTES_SELECT_COLUMNS)
         .order('id', { ascending: true });
 
       if (!res2.error && res2.data) {
@@ -532,6 +538,57 @@ export async function saveHouseInfoToSupabase(info: HouseInfo): Promise<boolean>
   } catch {
     return false;
   }
+}
+
+/**
+ * Upload gift image file/blob to Supabase Storage bucket 'presentes' and return its public URL.
+ * File structure: presentes/{id-do-presente}-{timestamp}-{index}.webp
+ */
+export async function uploadGiftImageToSupabaseStorage(
+  fileOrBlob: File | Blob,
+  giftId: string,
+  index = 0,
+  originalFileName?: string
+): Promise<{ url: string; error?: string } | null> {
+  const cleanId = String(giftId).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const timestamp = Date.now();
+  const ext = (originalFileName ? originalFileName.split('.').pop()?.toLowerCase() : '') || (fileOrBlob.type.includes('webp') ? 'webp' : 'jpg');
+  const cleanExt = ext.replace(/[^a-zA-Z0-9]/g, '') || 'webp';
+  const fileName = `${cleanId}-${timestamp}-${index}.${cleanExt}`;
+
+  // Candidate buckets to try in Supabase Storage (primary: 'presentes')
+  const bucketsToTry = ['presentes', 'public', 'imagens', 'images'];
+
+  for (const bucketName of bucketsToTry) {
+    try {
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(fileName, fileOrBlob, {
+          cacheControl: '31536000', // 1 year cache
+          upsert: true,
+          contentType: fileOrBlob.type || `image/${cleanExt}`,
+        });
+
+      if (!error && data) {
+        const { data: publicUrlData } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(fileName);
+
+        if (publicUrlData?.publicUrl) {
+          return { url: publicUrlData.publicUrl };
+        }
+      } else if (error) {
+        console.warn(`Tentativa de upload no bucket '${bucketName}' falhou:`, error.message);
+      }
+    } catch (err: any) {
+      console.warn(`Erro no bucket '${bucketName}':`, err?.message);
+    }
+  }
+
+  return {
+    url: '',
+    error: 'Não foi possível salvar a imagem no Supabase Storage. Verifique se o bucket "presentes" foi criado com acesso público no painel do Supabase.',
+  };
 }
 
 /**

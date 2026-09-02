@@ -25,7 +25,8 @@ import {
   Loader2,
   CheckCircle2
 } from 'lucide-react';
-import { uploadTextureToSupabaseStorage } from '../lib/supabase';
+import { uploadTextureToSupabaseStorage, uploadGiftImageToSupabaseStorage } from '../lib/supabase';
+import { compressImageForUpload } from '../lib/imageUtils';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -82,7 +83,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState(categories[0] || 'Cozinha');
   const [newDescription, setNewDescription] = useState('');
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [pendingGiftFiles, setPendingGiftFiles] = useState<{ file: File; previewUrl: string }[]>([]);
+  const [isSubmittingGift, setIsSubmittingGift] = useState(false);
   const [giftFormSuccess, setGiftFormSuccess] = useState('');
   const [giftFormError, setGiftFormError] = useState('');
   const giftFileInputRef = useRef<HTMLInputElement>(null);
@@ -135,58 +137,108 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
-  // Multiple image upload handler for Add Gift
+  // Multiple image upload handler for Add Gift (Prepares previews and files)
   const handleGiftImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const readers: Promise<string>[] = Array.from(files).map((file: File) => {
-      return new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          resolve(event.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-      });
-    });
+    const newItems = Array.from(files).map((file: File) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
 
-    Promise.all(readers).then((results) => {
-      setUploadedImages((prev) => [...prev, ...results]);
-    });
+    setPendingGiftFiles((prev) => [...prev, ...newItems]);
+    if (giftFileInputRef.current) {
+      giftFileInputRef.current.value = '';
+    }
   };
 
   const handleRemoveUploadedImage = (index: number) => {
-    setUploadedImages((prev) => prev.filter((_, idx) => idx !== index));
+    setPendingGiftFiles((prev) => {
+      const item = prev[index];
+      if (item?.previewUrl && item.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+      return prev.filter((_, idx) => idx !== index);
+    });
   };
 
-  // Submit Add Gift
-  const handleAddGiftSubmit = (e: React.FormEvent) => {
+  // Submit Add Gift (Compresses client-side, uploads to Supabase Storage 'presentes' bucket, saves public URL)
+  const handleAddGiftSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) {
       setGiftFormError('Por favor, informe o nome do presente.');
       return;
     }
 
-    const primaryImage = uploadedImages.length > 0 
-      ? uploadedImages[0] 
-      : 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=800&q=80';
-
-    onAddGift({
-      name: newName.trim(),
-      category: newCategory,
-      image: primaryImage,
-      images: uploadedImages.length > 0 ? uploadedImages : undefined,
-      description: newDescription.trim() || undefined,
-      isCustomAdded: true,
-    });
-
-    // Reset Form
-    setNewName('');
-    setNewDescription('');
-    setUploadedImages([]);
+    setIsSubmittingGift(true);
     setGiftFormError('');
-    setGiftFormSuccess('Presente adicionado com sucesso à lista!');
-    setTimeout(() => setGiftFormSuccess(''), 3000);
+    setGiftFormSuccess('');
+
+    try {
+      const tempGiftId = `gift-custom-${Date.now()}`;
+      const uploadedPublicUrls: string[] = [];
+
+      if (pendingGiftFiles.length > 0) {
+        for (let i = 0; i < pendingGiftFiles.length; i++) {
+          const item = pendingGiftFiles[i];
+          // 1. Compress image to max 1200px and webp format (or jpeg fallback)
+          const compressed = await compressImageForUpload(item.file, 1200, 1200, 0.82);
+
+          // 2. Upload to Supabase Storage bucket 'presentes'
+          const uploadRes = await uploadGiftImageToSupabaseStorage(
+            compressed.blob,
+            tempGiftId,
+            i,
+            compressed.fileName
+          );
+
+          if (uploadRes?.url) {
+            uploadedPublicUrls.push(uploadRes.url);
+          } else {
+            console.warn('Falha no upload do Supabase Storage:', uploadRes?.error);
+            setGiftFormError(
+              uploadRes?.error || 'Não foi possível enviar a imagem para o Supabase Storage. Verifique se o bucket "presentes" está configurado no Supabase.'
+            );
+            setIsSubmittingGift(false);
+            return;
+          }
+        }
+      }
+
+      const primaryImage = uploadedPublicUrls.length > 0
+        ? uploadedPublicUrls[0]
+        : 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=800&q=80';
+
+      onAddGift({
+        name: newName.trim(),
+        category: newCategory,
+        image: primaryImage,
+        images: uploadedPublicUrls.length > 0 ? uploadedPublicUrls : undefined,
+        description: newDescription.trim() || undefined,
+        isCustomAdded: true,
+      });
+
+      // Cleanup blob preview URLs
+      pendingGiftFiles.forEach((item) => {
+        if (item.previewUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+
+      // Reset Form
+      setNewName('');
+      setNewDescription('');
+      setPendingGiftFiles([]);
+      setGiftFormError('');
+      setGiftFormSuccess('Presente adicionado com sucesso! Imagem salva no Supabase Storage.');
+      setTimeout(() => setGiftFormSuccess(''), 4000);
+    } catch (err: any) {
+      console.error('Erro ao salvar presente:', err);
+      setGiftFormError('Erro ao processar imagem ou salvar presente no Supabase.');
+    } finally {
+      setIsSubmittingGift(false);
+    }
   };
 
   // Add Category
@@ -609,15 +661,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </div>
 
                     {/* Image Previews */}
-                    {uploadedImages.length > 0 && (
+                    {pendingGiftFiles.length > 0 && (
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-2">
-                        {uploadedImages.map((imgUrl, idx) => (
+                        {pendingGiftFiles.map((item, idx) => (
                           <div key={idx} className="relative aspect-square border border-[#BDC3C7] bg-white group overflow-hidden">
-                            <img src={imgUrl} alt={`Prévia ${idx + 1}`} className="w-full h-full object-cover" />
+                            <img src={item.previewUrl} alt={`Prévia ${idx + 1}`} className="w-full h-full object-cover" />
                             <button
                               type="button"
                               onClick={() => handleRemoveUploadedImage(idx)}
-                              className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-xs text-xs opacity-90 hover:opacity-100"
+                              disabled={isSubmittingGift}
+                              className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-xs text-xs opacity-90 hover:opacity-100 disabled:opacity-50"
                               title="Remover foto"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -636,10 +689,20 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   <button
                     id="btn-submit-new-gift"
                     type="submit"
-                    className="w-full py-3.5 bg-[#1A1A1A] hover:bg-[#34495E] text-white text-xs font-bold uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2"
+                    disabled={isSubmittingGift}
+                    className="w-full py-3.5 bg-[#1A1A1A] hover:bg-[#34495E] disabled:bg-[#7F8C8D] text-white text-xs font-bold uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                   >
-                    <Plus className="w-4 h-4 text-[#D2B48C]" />
-                    <span>Salvar Presente na Lista</span>
+                    {isSubmittingGift ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-[#D2B48C]" />
+                        <span>Enviando imagem para o Supabase Storage...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 text-[#D2B48C]" />
+                        <span>Salvar Presente na Lista</span>
+                      </>
+                    )}
                   </button>
                 </form>
               )}
