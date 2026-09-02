@@ -81,7 +81,6 @@ export function giftToDbPayload(gift: Partial<GiftItem>) {
   }
   if (gift.images !== undefined) {
     payload.imagens = gift.images;
-    payload.images = gift.images;
   }
   if (gift.description !== undefined) {
     payload.descricao = gift.description;
@@ -92,12 +91,6 @@ export function giftToDbPayload(gift: Partial<GiftItem>) {
   }
   if (gift.reservedBy !== undefined) {
     payload.reserved_by = gift.reservedBy;
-  }
-  if (gift.reservedAt !== undefined) {
-    payload.reserved_at = gift.reservedAt;
-  }
-  if (gift.reservationMessage !== undefined) {
-    payload.reservation_message = gift.reservationMessage;
   }
 
   return payload;
@@ -133,7 +126,7 @@ export function isStatementTimeoutError(err: any): boolean {
  * Columns required by the front-end to display cards and manage reservations
  * Avoids transferring unused or bloated columns
  */
-export const PRESENTES_SELECT_COLUMNS = 'id, nome, name, categoria, category, descricao, description, imagem, image, imagens, images, reserved, reserved_by, reserved_at, reservation_message';
+export const PRESENTES_SELECT_COLUMNS = 'id, nome, name, categoria, category, descricao, description, imagem, image, imagens, reserved, reserved_by';
 
 /**
  * Fetch all gifts from Supabase table 'presentes' with an automatic retry after 1s
@@ -325,11 +318,9 @@ export async function updateGiftReservationInSupabase(
       reserved: isReserved,
       reserved_by: isReserved ? (reservedBy || null) : null,
     };
-    if (reservedAt) {
-      payload.reserved_at = isReserved ? reservedAt : null;
-    }
     if (reservationMessage) {
-      payload.reservation_message = isReserved ? reservationMessage : null;
+      payload.message = isReserved ? reservationMessage : null;
+      payload.recado_reservado = isReserved ? reservationMessage : null;
     }
 
     let query = supabase
@@ -342,7 +333,7 @@ export async function updateGiftReservationInSupabase(
       query = query.eq('reserved', false);
     }
 
-    const { data: updateData, error } = await query.select();
+    const { data: updateData, error } = await query.select('id, reserved, reserved_by');
 
     if (!error) {
       if (isReserved && updateData && updateData.length === 0) {
@@ -366,7 +357,7 @@ export async function updateGiftReservationInSupabase(
       fallbackQuery = fallbackQuery.eq('reserved', false);
     }
 
-    const { data: fallbackData, error: errorOnlyReserved } = await fallbackQuery.select();
+    const { data: fallbackData, error: errorOnlyReserved } = await fallbackQuery.select('id, reserved, reserved_by');
 
     if (isReserved && fallbackData && fallbackData.length === 0) {
       return {
@@ -404,13 +395,12 @@ export async function addGiftToSupabase(gift: GiftItem): Promise<boolean> {
       imagem: gift.image,
       image: gift.image,
       imagens: gift.images || [gift.image],
-      images: gift.images || [gift.image],
       descricao: gift.description || '',
       description: gift.description || '',
       reserved: gift.isReserved || false,
       reserved_by: gift.reservedBy || null,
-      reserved_at: gift.reservedAt || null,
-      reservation_message: gift.reservationMessage || null,
+      message: gift.reservationMessage || null,
+      recado_reservado: gift.reservationMessage || null,
     };
 
     const { error } = await supabase
