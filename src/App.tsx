@@ -283,6 +283,34 @@ export function App() {
     localStorage.setItem('cha_casa_nova_my_reservations_v2', JSON.stringify(Array.from(myReservedGiftIds)));
   }, [myReservedGiftIds]);
 
+  // Reconciliação automática: mantém em myReservedGiftIds apenas itens que continuam com isReserved === true no banco
+  useEffect(() => {
+    if (gifts.length === 0 || myReservedGiftIds.size === 0) return;
+
+    const giftsMap = new Map(gifts.map((g) => [g.id, g.isReserved]));
+    let needsUpdate = false;
+    const reconciledIds = new Set<string>();
+
+    for (const id of myReservedGiftIds) {
+      // Mantém apenas se o item existe na lista e continua com status de reservado no banco
+      if (giftsMap.has(id)) {
+        if (giftsMap.get(id) === true) {
+          reconciledIds.add(id);
+        } else {
+          // O item foi liberado no banco (isReserved === false)
+          needsUpdate = true;
+        }
+      } else {
+        // O item foi excluído do banco
+        needsUpdate = true;
+      }
+    }
+
+    if (needsUpdate) {
+      setMyReservedGiftIds(reconciledIds);
+    }
+  }, [gifts, myReservedGiftIds]);
+
   const showToast = (text: string, type: 'success' | 'info' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => {
@@ -556,8 +584,15 @@ export function App() {
   }, [gifts]);
 
   const myReservedGiftsList = useMemo(() => {
-    return gifts.filter((g) => myReservedGiftIds.has(g.id));
+    return gifts.filter((g) => myReservedGiftIds.has(g.id) && g.isReserved);
   }, [gifts, myReservedGiftIds]);
+
+  // Se o filtro 'Meus' estiver selecionado e a lista ficar vazia, reseta suavemente para 'all'
+  useEffect(() => {
+    if (statusFilter === 'my_reserved' && myReservedGiftsList.length === 0) {
+      setStatusFilter('all');
+    }
+  }, [statusFilter, myReservedGiftsList.length]);
 
   const filteredGifts = useMemo(() => {
     const filtered = gifts.filter((gift) => {
@@ -573,7 +608,7 @@ export function App() {
       if (statusFilter === 'reserved' && !gift.isReserved) {
         return false;
       }
-      if (statusFilter === 'my_reserved' && !myReservedGiftIds.has(gift.id)) {
+      if (statusFilter === 'my_reserved' && (!myReservedGiftIds.has(gift.id) || !gift.isReserved)) {
         return false;
       }
 
@@ -845,7 +880,7 @@ export function App() {
                         key={gift.id}
                         gift={gift}
                         priority={index < 6}
-                        isMyReservation={myReservedGiftIds.has(gift.id)}
+                        isMyReservation={myReservedGiftIds.has(gift.id) && gift.isReserved}
                         onReserve={handleOpenReserveModal}
                         onCancelReservation={handleCancelReservation}
                       />
