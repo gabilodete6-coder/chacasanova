@@ -49,8 +49,6 @@ import {
   Gift
 } from 'lucide-react';
 
-const ADMIN_PASSWORD = '149610';
-
 export function App() {
   // 1. Core State directly from Supabase (Zero mock fallback)
   const [gifts, setGifts] = useState<GiftItem[]>([]);
@@ -407,13 +405,25 @@ export function App() {
     await updateGiftReservationInSupabase(giftId, false);
   };
 
-  // 6. Admin Authentication & Actions
-  const handleAdminAuthenticate = (pass: string) => {
-    if (pass === ADMIN_PASSWORD) {
-      setIsAdminAuthenticated(true);
-      return true;
+  // 6. Admin Authentication & Actions (Server-side validation)
+  const handleAdminAuthenticate = async (pass: string): Promise<boolean> => {
+    if (!pass || !pass.trim()) return false;
+    try {
+      const res = await fetch('/api/admin/verify-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass.trim() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        setIsAdminAuthenticated(true);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.warn('Falha de rede ao verificar senha admin:', err);
+      return false;
     }
-    return false;
   };
 
   const handleAdminLogout = () => {

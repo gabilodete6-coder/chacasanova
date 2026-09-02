@@ -32,7 +32,7 @@ interface AdminModalProps {
   isOpen: boolean;
   onClose: () => void;
   isAuthenticated: boolean;
-  onAuthenticate: (password: string) => boolean;
+  onAuthenticate: (password: string) => boolean | Promise<boolean>;
   onLogout: () => void;
   gifts: GiftItem[];
   categories: string[];
@@ -75,6 +75,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [adminSessionPassword, setAdminSessionPassword] = useState('');
+  const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
 
   // Tabs
   const [activeTab, setActiveTab] = useState<'add_gift' | 'categories' | 'manage_gifts' | 'textures' | 'settings'>('add_gift');
@@ -127,14 +129,32 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   if (!isOpen) return null;
 
   // Handle password submission
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (onAuthenticate(passwordInput)) {
-      setPasswordError('');
-      setPasswordInput('');
-    } else {
-      setPasswordError('Senha incorreta. Por favor, tente novamente.');
+    if (!passwordInput.trim()) return;
+
+    setIsVerifyingPassword(true);
+    setPasswordError('');
+
+    try {
+      const ok = await onAuthenticate(passwordInput);
+      if (ok) {
+        setAdminSessionPassword(passwordInput);
+        setPasswordError('');
+        setPasswordInput('');
+      } else {
+        setPasswordError('Senha incorreta. Por favor, tente novamente.');
+      }
+    } catch {
+      setPasswordError('Erro de conexão ao verificar senha.');
+    } finally {
+      setIsVerifyingPassword(false);
     }
+  };
+
+  const handleAdminLogoutAction = () => {
+    setAdminSessionPassword('');
+    onLogout();
   };
 
   // Multiple image upload handler for Add Gift (Prepares previews and files)
@@ -185,12 +205,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           // 1. Compress image to max 1200px and webp format (or jpeg fallback)
           const compressed = await compressImageForUpload(item.file, 1200, 1200, 0.82);
 
-          // 2. Upload to Supabase Storage bucket 'presentes'
+          // 2. Upload via secure server-side route to Supabase Storage bucket 'presentes'
           const uploadRes = await uploadGiftImageToSupabaseStorage(
             compressed.blob,
             tempGiftId,
             i,
-            compressed.fileName
+            compressed.fileName,
+            adminSessionPassword
           );
 
           if (uploadRes?.url) {
@@ -198,7 +219,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           } else {
             console.warn('Falha no upload do Supabase Storage:', uploadRes?.error);
             setGiftFormError(
-              uploadRes?.error || 'Não foi possível enviar a imagem para o Supabase Storage. Verifique se o bucket "presentes" está configurado no Supabase.'
+              uploadRes?.error || 'Não foi possível enviar a imagem para o Supabase Storage. Verifique a chave SUPABASE_SERVICE_ROLE_KEY no servidor.'
             );
             setIsSubmittingGift(false);
             return;
@@ -405,7 +426,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             {isAuthenticated && (
               <button
                 type="button"
-                onClick={onLogout}
+                onClick={handleAdminLogoutAction}
                 className="px-3 py-1.5 text-xs text-[#555] hover:text-[#C0392B] border border-[#BDC3C7] hover:bg-white font-semibold uppercase tracking-wider transition-colors"
                 title="Sair do painel"
               >
@@ -474,10 +495,20 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               <button
                 id="btn-submit-admin-password"
                 type="submit"
-                className="w-full py-3 bg-[#1A1A1A] hover:bg-[#34495E] text-white text-xs font-bold uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2"
+                disabled={isVerifyingPassword}
+                className="w-full py-3 bg-[#1A1A1A] hover:bg-[#34495E] disabled:opacity-60 text-white text-xs font-bold uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2"
               >
-                <Unlock className="w-4 h-4 text-[#D2B48C]" />
-                <span>Entrar no Painel</span>
+                {isVerifyingPassword ? (
+                  <>
+                    <Loader2 className="w-4 h-4 text-[#D2B48C] animate-spin" />
+                    <span>Verificando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="w-4 h-4 text-[#D2B48C]" />
+                    <span>Entrar no Painel</span>
+                  </>
+                )}
               </button>
             </form>
           </div>
