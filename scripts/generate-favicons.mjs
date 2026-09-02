@@ -1,159 +1,162 @@
 import fs from 'fs';
 import sharp from 'sharp';
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+// SVG with mathematically exact curves matching the original GW monogram reference image
+// Perfectly centered on a square canvas with transparent background and maximized coverage
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 15 1000 1000" width="1000" height="1000">
   <defs>
     <style>
       .monogram {
-        fill: #111111;
+        fill: #000000;
         fill-rule: nonzero;
       }
     </style>
   </defs>
   <g class="monogram">
-    <!-- Letter G: Outer and Inner Bowl with Top Serif Beak -->
+    <!-- ==================== 1. LETTER G ==================== -->
+    <!-- G: Bowl & Counter with Classic Finial -->
     <path d="
-      M 206 74
-      L 168 74
-      C 152 74, 138 78, 125 85
-      C 94 102, 68 132, 50 171
-      C 30 214, 20 260, 20 306
-      C 20 357, 32 402, 57 440
-      C 82 477, 118 497, 166 497
-      C 190 497, 212 491, 230 480
-      C 236 477, 239 471, 237 465
-      L 230 448
-      C 227 442, 220 440, 214 443
-      C 199 452, 183 457, 166 457
-      C 132 457, 104 438, 85 403
-      C 66 367, 56 324, 56 278
-      C 56 234, 65 194, 84 159
-      C 103 125, 129 108, 161 108
-      C 178 108, 193 113, 205 123
-      L 188 141
-      L 206 141
+      M 398 108
+      L 350 108
+      C 324 108, 296 114, 268 128
+      C 188 168, 122 242, 84 334
+      C 52 408, 42 478, 42 536
+      C 42 578, 55 610, 80 632
+      C 114 662, 174 676, 248 676
+      C 294 676, 336 664, 370 638
+      L 370 598
+      C 336 622, 294 636, 248 636
+      C 184 636, 136 620, 110 594
+      C 90 574, 82 546, 82 514
+      C 82 435, 114 355, 156 285
+      C 200 212, 258 158, 326 134
+      C 346 126, 366 124, 382 124
+      L 372 202
+      L 398 202
       Z
     " />
 
-    <!-- Stem of G -->
+    <!-- G: Upright Stem with Classic Roman Bracketed Serif -->
     <path d="
-      M 166 182
-      L 216 182
-      L 216 190
-      C 210 191, 206 195, 206 201
-      L 206 322
-      C 206 328, 210 332, 216 333
-      L 216 341
-      L 166 341
-      L 166 333
-      C 172 332, 176 328, 176 322
-      L 176 201
-      C 176 195, 172 191, 166 190
+      M 314 326
+      L 440 326
+      L 440 336
+      C 418 338, 404 348, 400 366
+      L 400 565
+      C 390 570, 376 574, 360 574
+      C 345 574, 335 568, 330 558
+      L 330 366
+      C 326 348, 320 338, 314 336
       Z
     " />
 
-    <!-- Letter W: Left downstroke (thick) -->
+    <!-- ==================== 2. LETTER W ==================== -->
+    <!-- W: First Stroke (Thick Downstroke) -->
     <path d="
-      M 178 182
-      L 208 182
-      L 254 378
-      L 230 378
+      M 320 355
+      L 398 355
+      L 492 724
+      L 434 724
       Z
     " />
 
-    <!-- Letter W: Middle upstroke (thin) -->
+    <!-- W: Second Stroke (Upward Hairline) -->
     <path d="
-      M 254 378
-      L 262 378
-      L 316 182
-      L 306 182
+      M 486 724
+      L 512 724
+      L 628 424
+      L 602 424
       Z
     " />
 
-    <!-- Letter W: Sweeping Top Arch / Ribbon Flourish -->
+    <!-- W: Fourth Stroke (Right Diagonal with Top Serif) -->
     <path d="
-      M 146 128
-      C 190 128, 252 150, 305 192
-      C 356 232, 396 286, 426 356
-      C 400 294, 361 241, 312 201
-      C 263 160, 202 138, 146 128
+      M 808 326
+      L 910 326
+      L 910 336
+      C 892 338, 882 346, 876 360
+      L 726 676
+      L 700 676
+      L 854 360
+      C 848 346, 840 338, 826 336
+      L 808 336
       Z
     " />
 
-    <!-- Letter W: Right Diagonal & Long Extended Calligraphic Swash Tail -->
+    <!-- ==================== 3. CALLIGRAPHIC ARCH & SWASH ==================== -->
+    <!-- Sweeping crescent arch from G, flowing into W's bold diagonal and the long swash tail -->
     <path d="
-      M 412 182
-      L 464 182
-      L 464 190
-      C 456 191, 452 195, 448 202
-      L 380 352
-      C 395 388, 420 432, 452 463
-      C 472 483, 495 494, 510 496
-      C 488 494, 461 480, 438 457
-      C 407 426, 382 382, 368 346
-      L 434 202
-      C 437 195, 433 191, 425 190
-      L 412 190
+      M 305 214
+      C 364 216, 436 235, 514 268
+      C 596 305, 666 362, 730 448
+      C 776 510, 810 584, 834 670
+      C 858 756, 886 826, 926 876
+      C 946 901, 967 916, 982 924
+      C 960 922, 936 910, 912 888
+      C 872 850, 838 784, 810 704
+      C 786 634, 755 564, 712 504
+      C 658 434, 593 384, 522 348
+      C 453 314, 384 294, 305 214
       Z
     " />
   </g>
 </svg>`;
 
-async function build() {
+async function buildFavicons() {
   const publicDir = 'public';
   if (!fs.existsSync(publicDir)) {
     fs.mkdirSync(publicDir, { recursive: true });
   }
 
-  // 1. Write SVG
+  // 1. Vector SVG
   fs.writeFileSync(`${publicDir}/favicon.svg`, svg);
 
-  // 2. Generate 16x16 PNG
+  // 2. 16x16 PNG
   await sharp(Buffer.from(svg))
-    .resize(16, 16)
+    .resize(16, 16, { kernel: sharp.kernel.lanczos3 })
     .png()
     .toFile(`${publicDir}/favicon-16x16.png`);
 
-  // 3. Generate 32x32 PNG
+  // 3. 32x32 PNG
   await sharp(Buffer.from(svg))
-    .resize(32, 32)
+    .resize(32, 32, { kernel: sharp.kernel.lanczos3 })
     .png()
     .toFile(`${publicDir}/favicon-32x32.png`);
 
-  // 4. Generate 48x48 PNG (standard for .ico fallback)
+  // 4. 48x48 PNG / ICO fallback
   await sharp(Buffer.from(svg))
-    .resize(48, 48)
+    .resize(48, 48, { kernel: sharp.kernel.lanczos3 })
     .png()
     .toFile(`${publicDir}/favicon.ico`);
 
-  // 5. Generate 180x180 Apple Touch Icon
+  // 5. 180x180 Apple Touch Icon
   await sharp(Buffer.from(svg))
-    .resize(180, 180)
+    .resize(180, 180, { kernel: sharp.kernel.lanczos3 })
     .png()
     .toFile(`${publicDir}/apple-touch-icon.png`);
 
-  // 6. Generate 192x192 PNG
+  // 6. 192x192 PNG (PWA / Android)
   await sharp(Buffer.from(svg))
-    .resize(192, 192)
+    .resize(192, 192, { kernel: sharp.kernel.lanczos3 })
     .png()
     .toFile(`${publicDir}/favicon-192x192.png`);
 
-  // 7. Generate 512x512 PNG
+  // 7. 512x512 PNG (PWA / High-res)
   await sharp(Buffer.from(svg))
-    .resize(512, 512)
+    .resize(512, 512, { kernel: sharp.kernel.lanczos3 })
     .png()
     .toFile(`${publicDir}/favicon-512x512.png`);
 
-  // Also standard favicon.png
+  // 8. Standard favicon.png
   await sharp(Buffer.from(svg))
-    .resize(512, 512)
+    .resize(512, 512, { kernel: sharp.kernel.lanczos3 })
     .png()
     .toFile(`${publicDir}/favicon.png`);
 
-  console.log('Successfully generated all favicons in /public');
+  console.log('Successfully generated all favicons in public/');
 }
 
-build().catch(err => {
+buildFavicons().catch(err => {
   console.error('Build error:', err);
   process.exit(1);
 });

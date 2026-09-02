@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 15 1000 1000" width="1000" height="1000">
+import sharp from 'sharp';
+
+function getMonogramSvg(hairlineScale = 1.0) {
+  // Center is at (511.5, 515.5)
+  // Bounding box with margin: width 939, height 815
+  // We center it perfectly inside a 1000x1000 canvas with viewBox="11.5 15.5 1000 1000"
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 15 1000 1000" width="1000" height="1000">
   <defs>
     <style>
       .monogram {
@@ -95,4 +101,32 @@
       Z
     " />
   </g>
-</svg>
+</svg>`;
+}
+
+async function run() {
+  const svg = getMonogramSvg();
+
+  for (const size of [32, 16]) {
+    console.log(`\n================== PREVIEW ${size}x${size} ==================`);
+    const { data, info } = await sharp(Buffer.from(svg))
+      .resize(size, size, { kernel: sharp.kernel.lanczos3 })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    for (let y = 0; y < info.height; y++) {
+      let line = '';
+      for (let x = 0; x < info.width; x++) {
+        const idx = (y * info.width + x) * info.channels;
+        const alpha = data[idx + 3];
+        if (alpha < 35) line += ' ';
+        else if (alpha < 110) line += '░';
+        else if (alpha < 190) line += '▒';
+        else line += '█';
+      }
+      console.log(line);
+    }
+  }
+}
+
+run();
