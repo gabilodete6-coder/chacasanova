@@ -37,6 +37,7 @@ import { ReservedSidebar } from './components/ReservedSidebar';
 import { ReserveModal } from './components/ReserveModal';
 import { MyReservationsModal } from './components/MyReservationsModal';
 import { AdminModal } from './components/AdminModal';
+import { MigrateImagesPage } from './components/MigrateImagesPage';
 import { Footer } from './components/Footer';
 import { 
   FilterX, 
@@ -116,6 +117,30 @@ export function App() {
 
   // 4. Toast Notification
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+
+  // 5. Temporary Migration Page Route (/admin/migrar-imagens or #admin-migrar)
+  const [isMigrationPage, setIsMigrationPage] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname || '';
+    const hash = window.location.hash || '';
+    return path.includes('migrar-imagens') || hash.includes('migrar-imagens') || hash.includes('admin-migrar');
+  });
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const path = window.location.pathname || '';
+      const hash = window.location.hash || '';
+      const isMigrate = path.includes('migrar-imagens') || hash.includes('migrar-imagens') || hash.includes('admin-migrar');
+      setIsMigrationPage(isMigrate);
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, []);
 
   // References
   const giftsSectionRef = useRef<HTMLDivElement>(null);
@@ -606,6 +631,21 @@ export function App() {
   const displayedGifts = useMemo(() => {
     return filteredGifts.slice(0, visibleCount);
   }, [filteredGifts, visibleCount]);
+
+  if (isMigrationPage) {
+    return (
+      <MigrateImagesPage
+        onBackToHome={() => {
+          if (window.location.pathname.includes('migrar-imagens')) {
+            window.history.pushState({}, '', '/');
+          } else {
+            window.location.hash = '';
+          }
+          setIsMigrationPage(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] flex flex-col font-sans selection:bg-[#D2B48C] selection:text-[#1A1A1A]">

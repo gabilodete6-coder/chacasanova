@@ -1268,6 +1268,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         <span>Sincronizar Lista Atual com Supabase</span>
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        window.history.pushState({}, '', '/admin/migrar-imagens');
+                        window.dispatchEvent(new Event('popstate'));
+                      }}
+                      className="w-full py-2.5 bg-[#1A1A1A] hover:bg-[#D2B48C] hover:text-[#1A1A1A] text-white text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                    >
+                      <Database className="w-3.5 h-3.5 text-[#D2B48C]" />
+                      <span>Abrir Ferramenta de Migração (/admin/migrar-imagens)</span>
+                    </button>
                   </div>
                 </div>
               )}
